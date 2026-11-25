@@ -39,7 +39,7 @@ const DDL_STATEMENTS = [
     nama_bahan VARCHAR(120) NOT NULL,
     id_kategori INTEGER NOT NULL REFERENCES kategori(id_kategori) ON DELETE RESTRICT,
     id_satuan INTEGER NOT NULL REFERENCES satuan(id_satuan) ON DELETE RESTRICT,
-    stok_saat_ini NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    stok_saat_ini NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (stok_saat_ini >= 0),
     stok_minimum NUMERIC(12, 2) NOT NULL DEFAULT 0,
     harga_terakhir INTEGER NOT NULL DEFAULT 0,
     aktif BOOLEAN NOT NULL DEFAULT TRUE,

@@ -6,17 +6,7 @@ import { bahan, detailTransaksi, kategori, pemasok, satuan, transaksi } from '..
 import { AppError } from '../lib/errors.js';
 import { roundQty, toNumber } from '../lib/numbers.js';
 import { isPreWeekendWib } from '../lib/time.js';
-import { isoDateSchema, MAX_INT4 } from '../lib/validation.js';
-
-function isValidCalendarDate(dateStr: string): boolean {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
-}
-
-const calendarDateSchema = isoDateSchema.refine(isValidCalendarDate, {
-  message: 'Tanggal kalender tidak valid.',
-});
+import { calendarDateSchema, MAX_INT4 } from '../lib/validation.js';
 
 const laporanQuerySchema = z.object({
   start_date: calendarDateSchema.optional(),

@@ -43,6 +43,13 @@ export function isPgErrorCode(err: unknown, code: string): boolean {
   return record.code === code || record.cause?.code === code;
 }
 
-export const isoDateSchema = z
+function isValidCalendarDate(dateStr: string): boolean {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+export const calendarDateSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal harus YYYY-MM-DD.');
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal harus YYYY-MM-DD.')
+  .refine(isValidCalendarDate, { message: 'Tanggal kalender tidak valid.' });

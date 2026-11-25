@@ -79,7 +79,10 @@ export const bahan = pgTable(
     created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex('uq_bahan_nama_lower').on(sql`lower(${table.nama_bahan})`)],
+  (table) => [
+    uniqueIndex('uq_bahan_nama_lower').on(sql`lower(${table.nama_bahan})`),
+    check('bahan_stok_non_negative', sql`${table.stok_saat_ini} >= 0`),
+  ],
 );
 
 export const transaksi = pgTable(

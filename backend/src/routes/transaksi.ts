@@ -22,21 +22,11 @@ import { roundQty, toNumber } from '../lib/numbers.js';
 import { todayWib } from '../lib/time.js';
 import {
   buildPagination,
-  isoDateSchema,
+  calendarDateSchema,
   MAX_INT4,
   MAX_NUMERIC_QTY,
   paginationQuerySchema,
 } from '../lib/validation.js';
-
-function isValidCalendarDate(dateStr: string): boolean {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
-}
-
-const calendarDateSchema = isoDateSchema.refine(isValidCalendarDate, {
-  message: 'Tanggal kalender tidak valid.',
-});
 
 const detailMasukSchema = z.object({
   id_bahan: z.number().int().min(1, 'Bahan wajib dipilih.').max(MAX_INT4),
@@ -298,7 +288,11 @@ export function createTransaksiRouter(db: AppDb): Router {
       .from(transaksi)
       .leftJoin(pemasok, eq(transaksi.id_pemasok, pemasok.id_pemasok))
       .where(whereClause)
-      .orderBy(desc(transaksi.waktu_transaksi), desc(transaksi.created_at))
+      .orderBy(
+        desc(transaksi.waktu_transaksi),
+        desc(transaksi.created_at),
+        desc(transaksi.id_transaksi),
+      )
       .limit(query.page_size)
       .offset((query.page - 1) * query.page_size);
 

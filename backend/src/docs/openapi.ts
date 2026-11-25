@@ -1,5 +1,23 @@
 import type { Express } from 'express';
 
+const intIdParam = [
+  {
+    name: 'id',
+    in: 'path',
+    required: true,
+    schema: { type: 'integer', minimum: 1 },
+  },
+];
+
+const uuidIdParam = [
+  {
+    name: 'id',
+    in: 'path',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  },
+];
+
 export const openApiSpec = {
   openapi: '3.0.3',
   info: {
@@ -45,6 +63,20 @@ export const openApiSpec = {
           password: { type: 'string', example: 'bledek123' },
         },
       },
+      KategoriInput: {
+        type: 'object',
+        required: ['nama_kategori'],
+        properties: {
+          nama_kategori: { type: 'string', example: 'Bahan Utama' },
+        },
+      },
+      SatuanInput: {
+        type: 'object',
+        required: ['nama_satuan'],
+        properties: {
+          nama_satuan: { type: 'string', example: 'kg' },
+        },
+      },
       BahanInput: {
         type: 'object',
         required: ['nama_bahan', 'id_kategori', 'id_satuan', 'stok_minimum'],
@@ -56,9 +88,27 @@ export const openApiSpec = {
           aktif: { type: 'boolean', example: true },
         },
       },
+      BahanPatchInput: {
+        type: 'object',
+        properties: {
+          nama_bahan: { type: 'string', example: 'Ayam Potong' },
+          id_kategori: { type: 'integer', example: 1 },
+          id_satuan: { type: 'integer', example: 1 },
+          stok_minimum: { type: 'number', example: 5 },
+          aktif: { type: 'boolean', example: true },
+        },
+      },
       PemasokInput: {
         type: 'object',
         required: ['nama_pemasok'],
+        properties: {
+          nama_pemasok: { type: 'string', example: 'Agen Ayam Segar Gunungpati' },
+          no_telepon: { type: 'string', example: '081220001101' },
+          alamat: { type: 'string', example: 'Jl. Raya Gunungpati No. 18, Semarang' },
+        },
+      },
+      PemasokPatchInput: {
+        type: 'object',
         properties: {
           nama_pemasok: { type: 'string', example: 'Agen Ayam Segar Gunungpati' },
           no_telepon: { type: 'string', example: '081220001101' },
@@ -132,18 +182,52 @@ export const openApiSpec = {
     },
     '/api/kategori': {
       get: { tags: ['Master Data'], summary: 'Daftar kategori bahan', responses: { '200': { description: 'Daftar kategori' } } },
-      post: { tags: ['Master Data'], summary: 'Tambah kategori bahan', responses: { '201': { description: 'Kategori dibuat' } } },
+      post: {
+        tags: ['Master Data'],
+        summary: 'Tambah kategori bahan',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/KategoriInput' } } },
+        },
+        responses: { '201': { description: 'Kategori dibuat' } },
+      },
     },
     '/api/kategori/{id}': {
-      patch: { tags: ['Master Data'], summary: 'Ubah kategori bahan', responses: { '200': { description: 'Kategori diperbarui' } } },
+      parameters: intIdParam,
+      patch: {
+        tags: ['Master Data'],
+        summary: 'Ubah kategori bahan',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/KategoriInput' } } },
+        },
+        responses: { '200': { description: 'Kategori diperbarui' } },
+      },
       delete: { tags: ['Master Data'], summary: 'Hapus kategori bahan', responses: { '200': { description: 'Kategori dihapus' }, '409': { description: 'Masih dipakai bahan' } } },
     },
     '/api/satuan': {
       get: { tags: ['Master Data'], summary: 'Daftar satuan bahan', responses: { '200': { description: 'Daftar satuan' } } },
-      post: { tags: ['Master Data'], summary: 'Tambah satuan bahan', responses: { '201': { description: 'Satuan dibuat' } } },
+      post: {
+        tags: ['Master Data'],
+        summary: 'Tambah satuan bahan',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/SatuanInput' } } },
+        },
+        responses: { '201': { description: 'Satuan dibuat' } },
+      },
     },
     '/api/satuan/{id}': {
-      patch: { tags: ['Master Data'], summary: 'Ubah satuan bahan', responses: { '200': { description: 'Satuan diperbarui' } } },
+      parameters: intIdParam,
+      patch: {
+        tags: ['Master Data'],
+        summary: 'Ubah satuan bahan',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/SatuanInput' } } },
+        },
+        responses: { '200': { description: 'Satuan diperbarui' } },
+      },
       delete: { tags: ['Master Data'], summary: 'Hapus satuan bahan', responses: { '200': { description: 'Satuan dihapus' }, '409': { description: 'Masih dipakai bahan' } } },
     },
     '/api/pemasok': {
@@ -159,8 +243,17 @@ export const openApiSpec = {
       },
     },
     '/api/pemasok/{id}': {
+      parameters: intIdParam,
       get: { tags: ['Master Data'], summary: 'Detail pemasok', responses: { '200': { description: 'Detail pemasok' } } },
-      patch: { tags: ['Master Data'], summary: 'Ubah pemasok', responses: { '200': { description: 'Pemasok diperbarui' } } },
+      patch: {
+        tags: ['Master Data'],
+        summary: 'Ubah pemasok',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/PemasokPatchInput' } } },
+        },
+        responses: { '200': { description: 'Pemasok diperbarui' } },
+      },
       delete: { tags: ['Master Data'], summary: 'Hapus pemasok', responses: { '200': { description: 'Pemasok dihapus' }, '409': { description: 'Masih dipakai transaksi' } } },
     },
     '/api/bahan': {
@@ -176,8 +269,17 @@ export const openApiSpec = {
       },
     },
     '/api/bahan/{id}': {
+      parameters: intIdParam,
       get: { tags: ['Master Data'], summary: 'Detail bahan', responses: { '200': { description: 'Detail bahan' } } },
-      patch: { tags: ['Master Data'], summary: 'Ubah bahan atau aktif/nonaktif', responses: { '200': { description: 'Bahan diperbarui' } } },
+      patch: {
+        tags: ['Master Data'],
+        summary: 'Ubah bahan atau aktif/nonaktif',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/BahanPatchInput' } } },
+        },
+        responses: { '200': { description: 'Bahan diperbarui' } },
+      },
       delete: { tags: ['Master Data'], summary: 'Nonaktifkan bahan (soft delete)', responses: { '200': { description: 'Bahan dinonaktifkan' } } },
     },
     '/api/transaksi': {
@@ -193,6 +295,7 @@ export const openApiSpec = {
       },
     },
     '/api/transaksi/{id}': {
+      parameters: uuidIdParam,
       get: { tags: ['Transaksi'], summary: 'Detail satu transaksi', responses: { '200': { description: 'Detail transaksi' } } },
       delete: { tags: ['Transaksi'], summary: 'Batalkan transaksi dan kembalikan stok atomik', responses: { '200': { description: 'Transaksi dibatalkan' }, '409': { description: 'Stok sudah terpakai' } } },
     },
@@ -210,7 +313,12 @@ export const openApiSpec = {
         parameters: [
           { name: 'start_date', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'end_date', in: 'query', schema: { type: 'string', format: 'date' } },
-          { name: 'id_bahan', in: 'query', schema: { type: 'integer' } },
+          {
+            name: 'id_bahan',
+            in: 'query',
+            description: 'Memfilter riwayat_harga dan ringkasan_harga_bahan untuk satu bahan tertentu.',
+            schema: { type: 'integer' },
+          },
           { name: 'weekend_mode', in: 'query', schema: { type: 'boolean' } },
         ],
         responses: { '200': { description: 'Data laporan persediaan lengkap' } },

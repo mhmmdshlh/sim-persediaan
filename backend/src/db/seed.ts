@@ -401,11 +401,21 @@ export async function seedDatabase(db: AppDb): Promise<SeedResult> {
   return { seeded: true, counts: await getCounts(db) };
 }
 
-const isDirectExecution =
-  process.argv[1] !== undefined &&
-  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+export function isDirectEntryPoint(
+  argvPath: string | undefined,
+  modulePath: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  if (!argvPath) return false;
+  const resolvedArg = path.resolve(argvPath);
+  const resolvedMod = path.resolve(modulePath);
+  if (platform === 'win32') {
+    return resolvedArg.toLowerCase() === resolvedMod.toLowerCase();
+  }
+  return resolvedArg === resolvedMod;
+}
 
-if (isDirectExecution) {
+if (isDirectEntryPoint(process.argv[1], fileURLToPath(import.meta.url))) {
   const config = parseEnv();
   createDbClient({ databaseUrl: config.databaseUrl || undefined })
     .then(async (handle) => {
