@@ -1,7 +1,8 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom"
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-import { AppLayout } from "@/components/layout/app-layout"
-import { DashboardPage } from "@/pages/dashboard"
+import { AppLayout } from "@/components/layout/app-layout";
+import { DashboardPage } from "@/pages/dashboard";
+import { BahanPage } from "@/pages/bahan";
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -11,7 +12,7 @@ function PlaceholderPage({ title }: { title: string }) {
         Halaman ini sedang dalam tahap pengembangan.
       </p>
     </div>
-  )
+  );
 }
 
 function App() {
@@ -21,20 +22,14 @@ function App() {
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
 
-          <Route
-            path="bahan"
-            element={<PlaceholderPage title="Data Bahan" />}
-          />
+          <Route path="bahan" element={<BahanPage />} />
 
           <Route
             path="kategori"
             element={<PlaceholderPage title="Kategori Bahan" />}
           />
 
-          <Route
-            path="satuan"
-            element={<PlaceholderPage title="Satuan" />}
-          />
+          <Route path="satuan" element={<PlaceholderPage title="Satuan" />} />
 
           <Route
             path="pemasok"
@@ -63,7 +58,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
 
-export default App
+export default App;
