@@ -1,38 +1,37 @@
-import { useRef, useState, type SubmitEvent } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { useRef, useState, type SubmitEvent } from "react";
+import { Plus, Trash2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
-import type {
-  JenisTransaksi,
-  TransaksiDraft,
-} from "@/types/transaksi"
+import type { JenisTransaksi, TransaksiDraft } from "@/types/transaksi";
+
+import { saveTransaction } from "@/services/transaksi-storage";
 
 interface TransaksiFormProps {
-  mode: JenisTransaksi
+  mode: JenisTransaksi;
 }
 
 interface DetailFormState {
-  rowId: number
-  id_bahan: string
-  jumlah: string
-  harga_beli_satuan: string
+  rowId: number;
+  id_bahan: string;
+  jumlah: string;
+  harga_beli_satuan: string;
 }
 
 const BAHAN_OPTIONS = [
@@ -41,31 +40,31 @@ const BAHAN_OPTIONS = [
   { id: 3, nama: "Cabai", satuan: "kg", stokSaatIni: 1 },
   { id: 4, nama: "Minyak Goreng", satuan: "liter", stokSaatIni: 4 },
   { id: 5, nama: "Lunch Box", satuan: "buah", stokSaatIni: 120 },
-]
+];
 
 const PEMASOK_OPTIONS = [
   { id: 1, nama: "Pemasok Contoh 1" },
   { id: 2, nama: "Pemasok Contoh 2" },
-]
+];
 
 const BAHAN_ITEMS = BAHAN_OPTIONS.map((bahan) => ({
   label: `${bahan.nama} (${bahan.satuan})`,
   value: String(bahan.id),
-}))
+}));
 
 const PEMASOK_ITEMS = PEMASOK_OPTIONS.map((pemasok) => ({
   label: pemasok.nama,
   value: String(pemasok.id),
-}))
+}));
 
 export function TransaksiForm({ mode }: TransaksiFormProps) {
-  const isMasuk = mode === "masuk"
+  const isMasuk = mode === "masuk";
 
-  const nextRowId = useRef(2)
+  const nextRowId = useRef(2);
 
-  const [tanggal, setTanggal] = useState("")
-  const [idPemasok, setIdPemasok] = useState("")
-  const [catatan, setCatatan] = useState("")
+  const [tanggal, setTanggal] = useState("");
+  const [idPemasok, setIdPemasok] = useState("");
+  const [catatan, setCatatan] = useState("");
   const [items, setItems] = useState<DetailFormState[]>([
     {
       rowId: 1,
@@ -73,13 +72,14 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
       jumlah: "",
       harga_beli_satuan: "",
     },
-  ])
+  ]);
 
-  const [error, setError] = useState("")
-  const [lastSubmission, setLastSubmission] =
-    useState<TransaksiDraft | null>(null)
+  const [error, setError] = useState("");
+  const [lastSubmission, setLastSubmission] = useState<TransaksiDraft | null>(
+    null,
+  );
 
-  const title = isMasuk ? "Barang Masuk" : "Barang Keluar"
+  const title = isMasuk ? "Barang Masuk" : "Barang Keluar";
 
   function updateDetail(
     rowId: number,
@@ -87,18 +87,16 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
   ) {
     setItems((current) =>
       current.map((item) =>
-        item.rowId === rowId
-          ? { ...item, ...changes }
-          : item,
+        item.rowId === rowId ? { ...item, ...changes } : item,
       ),
-    )
-    setError("")
-    setLastSubmission(null)
+    );
+    setError("");
+    setLastSubmission(null);
   }
 
   function addDetail() {
-    const rowId = nextRowId.current
-    nextRowId.current += 1
+    const rowId = nextRowId.current;
+    nextRowId.current += 1;
 
     setItems((current) => [
       ...current,
@@ -108,33 +106,31 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
         jumlah: "",
         harga_beli_satuan: "",
       },
-    ])
+    ]);
 
-    setError("")
-    setLastSubmission(null)
+    setError("");
+    setLastSubmission(null);
   }
 
   function removeDetail(rowId: number) {
-    setItems((current) =>
-      current.filter((item) => item.rowId !== rowId),
-    )
-    setError("")
-    setLastSubmission(null)
+    setItems((current) => current.filter((item) => item.rowId !== rowId));
+    setError("");
+    setLastSubmission(null);
   }
 
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setError("")
-    setLastSubmission(null)
+    event.preventDefault();
+    setError("");
+    setLastSubmission(null);
 
     if (!tanggal) {
-      setError("Tanggal transaksi wajib diisi.")
-      return
+      setError("Tanggal transaksi wajib diisi.");
+      return;
     }
 
     if (isMasuk && !idPemasok) {
-      setError("Pemasok wajib dipilih.")
-      return
+      setError("Pemasok wajib dipilih.");
+      return;
     }
 
     if (
@@ -145,36 +141,30 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
           (isMasuk && !item.harga_beli_satuan.trim()),
       )
     ) {
-      setError("Semua informasi detail bahan wajib diisi.")
-      return
+      setError("Semua informasi detail bahan wajib diisi.");
+      return;
     }
 
-    const selectedIds = items.map((item) =>
-      Number(item.id_bahan),
-    )
+    const selectedIds = items.map((item) => Number(item.id_bahan));
 
     if (new Set(selectedIds).size !== selectedIds.length) {
-      setError("Bahan yang sama tidak boleh dimasukkan dua kali.")
-      return
+      setError("Bahan yang sama tidak boleh dimasukkan dua kali.");
+      return;
     }
 
     const details = items.map((item) => ({
       id_bahan: Number(item.id_bahan),
       jumlah: Number(item.jumlah),
-      harga_beli_satuan: isMasuk
-        ? Number(item.harga_beli_satuan)
-        : null,
-    }))
+      harga_beli_satuan: isMasuk ? Number(item.harga_beli_satuan) : null,
+    }));
 
     const invalidQuantity = details.some(
-      (item) =>
-        !Number.isFinite(item.jumlah) ||
-        item.jumlah <= 0,
-    )
+      (item) => !Number.isFinite(item.jumlah) || item.jumlah <= 0,
+    );
 
     if (invalidQuantity) {
-      setError("Jumlah bahan harus lebih besar dari nol.")
-      return
+      setError("Jumlah bahan harus lebih besar dari nol.");
+      return;
     }
 
     if (
@@ -186,29 +176,29 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
           item.harga_beli_satuan <= 0,
       )
     ) {
-      setError("Harga beli harus lebih besar dari nol.")
-      return
+      setError("Harga beli harus lebih besar dari nol.");
+      return;
     }
 
     if (!isMasuk) {
       const insufficientStock = details.find((detail) => {
         const bahan = BAHAN_OPTIONS.find(
           (option) => option.id === detail.id_bahan,
-        )
+        );
 
-        return bahan && detail.jumlah > bahan.stokSaatIni
-      })
+        return bahan && detail.jumlah > bahan.stokSaatIni;
+      });
 
       if (insufficientStock) {
         const bahan = BAHAN_OPTIONS.find(
           (option) => option.id === insufficientStock.id_bahan,
-        )
+        );
 
         setError(
           `Stok ${bahan?.nama ?? "bahan"} tidak mencukupi. ` +
-          `Stok tersedia: ${bahan?.stokSaatIni} ${bahan?.satuan}.`,
-        )
-        return
+            `Stok tersedia: ${bahan?.stokSaatIni} ${bahan?.satuan}.`,
+        );
+        return;
       }
     }
 
@@ -218,17 +208,28 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
       id_pemasok: isMasuk ? Number(idPemasok) : null,
       catatan: catatan.trim(),
       detail: details,
-    }
+    };
 
-    setLastSubmission(payload)
+    const detailRecords = details.map((detail) => {
+      const bahan = BAHAN_OPTIONS.find(
+        (option) => option.id === detail.id_bahan,
+      );
+
+      return {
+        ...detail,
+        nama_bahan: bahan?.nama ?? `Bahan #${detail.id_bahan}`,
+        satuan: bahan?.satuan ?? "",
+      };
+    });
+
+    saveTransaction(payload, detailRecords);
+    setLastSubmission(payload);
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {title}
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
 
         <p className="mt-1 text-sm text-muted-foreground">
           {isMasuk
@@ -259,9 +260,9 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                   type="date"
                   value={tanggal}
                   onChange={(event) => {
-                    setTanggal(event.target.value)
-                    setError("")
-                    setLastSubmission(null)
+                    setTanggal(event.target.value);
+                    setError("");
+                    setLastSubmission(null);
                   }}
                   required
                 />
@@ -276,9 +277,9 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                   <Select
                     value={idPemasok}
                     onValueChange={(value) => {
-                      setIdPemasok(value ?? "")
-                      setError("")
-                      setLastSubmission(null)
+                      setIdPemasok(value ?? "");
+                      setError("");
+                      setLastSubmission(null);
                     }}
                     items={PEMASOK_ITEMS}
                   >
@@ -288,10 +289,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
 
                     <SelectContent>
                       {PEMASOK_ITEMS.map((item) => (
-                        <SelectItem
-                          key={item.value}
-                          value={item.value}
-                        >
+                        <SelectItem key={item.value} value={item.value}>
                           {item.label}
                         </SelectItem>
                       ))}
@@ -305,9 +303,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold">
-                    Detail Bahan
-                  </h2>
+                  <h2 className="text-base font-semibold">Detail Bahan</h2>
                   <p className="text-sm text-muted-foreground">
                     Tambahkan satu atau beberapa bahan.
                   </p>
@@ -327,7 +323,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
               {items.map((item, index) => {
                 const selectedBahan = BAHAN_OPTIONS.find(
                   (bahan) => bahan.id === Number(item.id_bahan),
-                )
+                );
 
                 return (
                   <div
@@ -335,9 +331,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                     className="space-y-4 rounded-lg border p-4"
                   >
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold">
-                        Bahan {index + 1}
-                      </p>
+                      <p className="text-sm font-semibold">Bahan {index + 1}</p>
 
                       <Button
                         type="button"
@@ -445,7 +439,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                       </p>
                     )}
                   </div>
-                )
+                );
               })}
             </div>
 
@@ -459,8 +453,8 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                 id="catatan"
                 value={catatan}
                 onChange={(event) => {
-                  setCatatan(event.target.value)
-                  setLastSubmission(null)
+                  setCatatan(event.target.value);
+                  setLastSubmission(null);
                 }}
                 rows={3}
                 placeholder="Tambahkan catatan transaksi..."
@@ -475,9 +469,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
             )}
 
             <div className="flex justify-end">
-              <Button type="submit">
-                Validasi Transaksi
-              </Button>
+              <Button type="submit">Validasi Transaksi</Button>
             </div>
           </form>
         </CardContent>
@@ -488,9 +480,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-base">
-                Ringkasan Transaksi
-              </CardTitle>
+              <CardTitle className="text-base">Ringkasan Transaksi</CardTitle>
 
               <Badge variant="outline">Data sementara</Badge>
             </div>
@@ -501,14 +491,10 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
           </CardHeader>
 
           <CardContent className="space-y-3">
-            <p className="text-sm">
-              Tanggal: {lastSubmission.waktu_transaksi}
-            </p>
+            <p className="text-sm">Tanggal: {lastSubmission.waktu_transaksi}</p>
 
             {lastSubmission.id_pemasok !== null && (
-              <p className="text-sm">
-                ID Pemasok: {lastSubmission.id_pemasok}
-              </p>
+              <p className="text-sm">ID Pemasok: {lastSubmission.id_pemasok}</p>
             )}
 
             <p className="text-sm">
@@ -519,7 +505,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
               {lastSubmission.detail.map((detail) => {
                 const bahan = BAHAN_OPTIONS.find(
                   (option) => option.id === detail.id_bahan,
-                )
+                );
 
                 return (
                   <div
@@ -531,12 +517,12 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                       {detail.jumlah} {bahan?.satuan}
                     </span>
                   </div>
-                )
+                );
               })}
             </div>
           </CardContent>
         </Card>
       )}
     </div>
-  )
+  );
 }

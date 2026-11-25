@@ -8,6 +8,7 @@ import { SatuanPage } from "@/pages/satuan";
 import { PemasokPage } from "@/pages/pemasok";
 import { TransaksiMasukPage } from "@/pages/transaksi-masuk";
 import { TransaksiKeluarPage } from "@/pages/transaksi-keluar";
+import { RiwayatPage } from "@/pages/riwayat";
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -38,10 +39,7 @@ function App() {
           <Route path="transaksi/masuk" element={<TransaksiMasukPage />} />
 
           <Route path="transaksi/keluar" element={<TransaksiKeluarPage />} />
-          <Route
-            path="riwayat"
-            element={<PlaceholderPage title="Riwayat Transaksi" />}
-          />
+          <Route path="riwayat" element={<RiwayatPage />} />
 
           <Route
             path="laporan"
