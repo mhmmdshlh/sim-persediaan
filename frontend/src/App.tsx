@@ -9,17 +9,7 @@ import { PemasokPage } from "@/pages/pemasok";
 import { TransaksiMasukPage } from "@/pages/transaksi-masuk";
 import { TransaksiKeluarPage } from "@/pages/transaksi-keluar";
 import { RiwayatPage } from "@/pages/riwayat";
-
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Halaman ini sedang dalam tahap pengembangan.
-      </p>
-    </div>
-  );
-}
+import { LaporanPage } from "@/pages/laporan";
 
 function App() {
   return (
@@ -41,10 +31,7 @@ function App() {
           <Route path="transaksi/keluar" element={<TransaksiKeluarPage />} />
           <Route path="riwayat" element={<RiwayatPage />} />
 
-          <Route
-            path="laporan"
-            element={<PlaceholderPage title="Laporan Persediaan" />}
-          />
+          <Route path="laporan" element={<LaporanPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
