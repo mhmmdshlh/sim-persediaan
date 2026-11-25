@@ -9,6 +9,10 @@ import { AppError } from './lib/errors.js';
 import { createRequireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { createAuthRouter } from './routes/auth.js';
+import { createBahanRouter } from './routes/bahan.js';
+import { createKategoriRouter } from './routes/kategori.js';
+import { createPemasokRouter } from './routes/pemasok.js';
+import { createSatuanRouter } from './routes/satuan.js';
 
 export function createApp(db: AppDb, config: AppConfig): Express {
   const app = express();
@@ -44,6 +48,10 @@ export function createApp(db: AppDb, config: AppConfig): Express {
   });
 
   app.use('/api/auth', createAuthRouter(db, config, requireAuth));
+  app.use('/api/kategori', requireAuth, createKategoriRouter(db));
+  app.use('/api/satuan', requireAuth, createSatuanRouter(db));
+  app.use('/api/pemasok', requireAuth, createPemasokRouter(db));
+  app.use('/api/bahan', requireAuth, createBahanRouter(db));
 
   app.use((_req, _res, next) => {
     next(new AppError(404, 'NOT_FOUND', 'Endpoint tidak ditemukan.'));
