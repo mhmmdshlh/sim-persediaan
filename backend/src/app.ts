@@ -6,7 +6,9 @@ import helmet from 'helmet';
 import type { AppConfig } from './config/env.js';
 import type { AppDb } from './db/client.js';
 import { AppError } from './lib/errors.js';
+import { createRequireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { createAuthRouter } from './routes/auth.js';
 
 export function createApp(db: AppDb, config: AppConfig): Express {
   const app = express();
@@ -28,6 +30,8 @@ export function createApp(db: AppDb, config: AppConfig): Express {
   app.use(cookieParser());
   app.use(express.json({ limit: '100kb' }));
 
+  const requireAuth = createRequireAuth(db, config.jwtSecret);
+
   app.get('/api/health', async (_req, res) => {
     await db.execute(sql`SELECT 1`);
     res.json({
@@ -38,6 +42,8 @@ export function createApp(db: AppDb, config: AppConfig): Express {
       },
     });
   });
+
+  app.use('/api/auth', createAuthRouter(db, config, requireAuth));
 
   app.use((_req, _res, next) => {
     next(new AppError(404, 'NOT_FOUND', 'Endpoint tidak ditemukan.'));
