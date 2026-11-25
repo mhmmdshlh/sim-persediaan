@@ -4,6 +4,7 @@ import { createApp } from './app.js';
 import { parseEnv } from './config/env.js';
 import { bootstrapSchema } from './db/bootstrap.js';
 import { createDbClient } from './db/client.js';
+import { seedDatabase } from './db/seed.js';
 
 const config = parseEnv();
 
@@ -18,6 +19,7 @@ async function getInitializedApp(): Promise<Express> {
       });
       if (handle.mode === 'pglite') {
         await bootstrapSchema(handle.db);
+        await seedDatabase(handle.db);
       }
       return createApp(handle.db, config);
     })();
@@ -44,6 +46,7 @@ if (!config.isVercel && config.nodeEnv !== 'test') {
     .then(() => {
       entryApp.listen(config.port, () => {
         console.log(`Sistem Stok Bledek API berjalan di http://localhost:${config.port}`);
+        console.log(`Dokumentasi API: http://localhost:${config.port}/docs`);
       });
     })
     .catch((err) => {

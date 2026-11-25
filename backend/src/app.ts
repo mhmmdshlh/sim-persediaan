@@ -5,6 +5,7 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import type { AppConfig } from './config/env.js';
 import type { AppDb } from './db/client.js';
+import { registerDocsRoutes } from './docs/openapi.js';
 import { AppError } from './lib/errors.js';
 import { createRequireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error-handler.js';
@@ -38,6 +39,8 @@ export function createApp(db: AppDb, config: AppConfig): Express {
   app.use(express.json({ limit: '100kb' }));
 
   const requireAuth = createRequireAuth(db, config.jwtSecret);
+
+  registerDocsRoutes(app);
 
   app.get('/api/health', async (_req, res) => {
     await db.execute(sql`SELECT 1`);
