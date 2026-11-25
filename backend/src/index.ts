@@ -5,6 +5,7 @@ import { parseEnv } from './config/env.js';
 import { bootstrapSchema } from './db/bootstrap.js';
 import { createDbClient } from './db/client.js';
 import { seedDatabase } from './db/seed.js';
+import { errorHandler } from './middleware/error-handler.js';
 
 const config = parseEnv();
 
@@ -22,7 +23,10 @@ async function getInitializedApp(): Promise<Express> {
         await seedDatabase(handle.db);
       }
       return createApp(handle.db, config);
-    })();
+    })().catch((err) => {
+      initializedAppPromise = null;
+      throw err;
+    });
   }
   return initializedAppPromise;
 }
@@ -38,6 +42,7 @@ entryApp.use(async (req, res, next) => {
     next(err);
   }
 });
+entryApp.use(errorHandler);
 
 export default entryApp;
 

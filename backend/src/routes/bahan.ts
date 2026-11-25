@@ -9,24 +9,35 @@ import { computeStockStatus } from '../lib/stock.js';
 import {
   buildPagination,
   isPgErrorCode,
+  MAX_INT4,
+  MAX_NUMERIC_QTY,
   paginationQuerySchema,
   parsePositiveIntId,
 } from '../lib/validation.js';
 
 const createBahanSchema = z.object({
   nama_bahan: z.string().trim().min(1, 'Nama bahan wajib diisi.').max(120),
-  id_kategori: z.coerce.number().int().positive('Kategori wajib dipilih.'),
-  id_satuan: z.coerce.number().int().positive('Satuan wajib dipilih.'),
-  stok_minimum: z.coerce.number().finite().min(0, 'Stok minimum tidak boleh negatif.'),
+  id_kategori: z.number().int().min(1, 'Kategori wajib dipilih.').max(MAX_INT4),
+  id_satuan: z.number().int().min(1, 'Satuan wajib dipilih.').max(MAX_INT4),
+  stok_minimum: z
+    .number()
+    .finite()
+    .min(0, 'Stok minimum tidak boleh negatif.')
+    .max(MAX_NUMERIC_QTY, 'Stok minimum melebihi batas maksimal.'),
   aktif: z.boolean().optional().default(true),
 });
 
 const updateBahanSchema = z
   .object({
     nama_bahan: z.string().trim().min(1, 'Nama bahan wajib diisi.').max(120).optional(),
-    id_kategori: z.coerce.number().int().positive('Kategori tidak valid.').optional(),
-    id_satuan: z.coerce.number().int().positive('Satuan tidak valid.').optional(),
-    stok_minimum: z.coerce.number().finite().min(0, 'Stok minimum tidak boleh negatif.').optional(),
+    id_kategori: z.number().int().min(1, 'Kategori tidak valid.').max(MAX_INT4).optional(),
+    id_satuan: z.number().int().min(1, 'Satuan tidak valid.').max(MAX_INT4).optional(),
+    stok_minimum: z
+      .number()
+      .finite()
+      .min(0, 'Stok minimum tidak boleh negatif.')
+      .max(MAX_NUMERIC_QTY, 'Stok minimum melebihi batas maksimal.')
+      .optional(),
     aktif: z.boolean().optional(),
   })
   .refine((val) => Object.keys(val).length > 0, {
@@ -39,7 +50,7 @@ const listQuerySchema = paginationQuerySchema.extend({
     .enum(['true', 'false'])
     .transform((v) => v === 'true')
     .optional(),
-  id_kategori: z.coerce.number().int().positive().optional(),
+  id_kategori: z.coerce.number().int().min(1).max(MAX_INT4).optional(),
   status: z.enum(['habis', 'menipis', 'aman']).optional(),
 });
 

@@ -20,22 +20,31 @@ export interface AppConfig {
   allowedOrigins: string[];
 }
 
+export function normalizeOrigin(origin: string): string {
+  return origin.trim().replace(/\/+$/, '');
+}
+
 export function parseEnv(raw: Record<string, string | undefined> = process.env): AppConfig {
   const parsed = rawEnvSchema.parse(raw);
-  const isProd = parsed.NODE_ENV === 'production';
+  const isVercel = parsed.VERCEL === '1';
+  const isDeployedProd = parsed.NODE_ENV === 'production' || isVercel;
 
-  if (isProd && parsed.JWT_SECRET.length < 32) {
-    throw new Error('JWT_SECRET wajib diisi minimal 32 karakter pada lingkungan produksi.');
+  if (isDeployedProd && parsed.JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET wajib diisi minimal 32 karakter pada lingkungan produksi/Vercel.');
+  }
+
+  if (isVercel && !parsed.DATABASE_URL) {
+    throw new Error('DATABASE_URL wajib diisi saat menjalankan backend di Vercel.');
   }
 
   const jwtSecret = parsed.JWT_SECRET || DEV_FALLBACK_JWT_SECRET;
   const allowedOrigins = parsed.ALLOWED_ORIGINS.split(',')
-    .map((origin) => origin.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
 
   return {
     nodeEnv: parsed.NODE_ENV,
-    isVercel: parsed.VERCEL === '1',
+    isVercel,
     port: parsed.PORT,
     databaseUrl: parsed.DATABASE_URL,
     jwtSecret,

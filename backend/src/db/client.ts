@@ -1,8 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { PGlite } from '@electric-sql/pglite';
 import { drizzle as drizzlePg, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { drizzle as drizzlePglite } from 'drizzle-orm/pglite';
 import pg from 'pg';
 import * as schema from './schema.js';
 
@@ -21,13 +19,26 @@ export interface CreateDbOptions {
   isVercel?: boolean;
 }
 
+export function createPgPool(databaseUrl: string, isVercel = false): pg.Pool {
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    max: isVercel ? 5 : 10,
+    idleTimeoutMillis: isVercel ? 10_000 : 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
+
+  // Prevent unhandled pool errors when Neon auto-suspends idle connections.
+  pool.on('error', (err) => {
+    console.error('[pg-pool-error]', err);
+  });
+
+  return pool;
+}
+
 // Source: https://orm.drizzle.team/docs/get-started-postgresql and https://orm.drizzle.team/docs/connect-pglite
 export async function createDbClient(options: CreateDbOptions = {}): Promise<DbClientHandle> {
   if (options.databaseUrl) {
-    const pool = new pg.Pool({
-      connectionString: options.databaseUrl,
-      max: options.isVercel ? 5 : 10,
-    });
+    const pool = createPgPool(options.databaseUrl, options.isVercel);
     const db = drizzlePg(pool, { schema });
     return {
       db,
@@ -37,6 +48,12 @@ export async function createDbClient(options: CreateDbOptions = {}): Promise<DbC
       },
     };
   }
+
+  // Load PGlite lazily so Vercel PostgreSQL deployments do not bundle ~15 MB WASM.
+  const [{ PGlite }, { drizzle: drizzlePglite }] = await Promise.all([
+    import('@electric-sql/pglite'),
+    import('drizzle-orm/pglite'),
+  ]);
 
   const target = options.memory
     ? 'memory://'

@@ -6,7 +6,7 @@ import { bahan, detailTransaksi, kategori, pemasok, satuan, transaksi } from '..
 import { AppError } from '../lib/errors.js';
 import { roundQty, toNumber } from '../lib/numbers.js';
 import { isPreWeekendWib } from '../lib/time.js';
-import { isoDateSchema } from '../lib/validation.js';
+import { isoDateSchema, MAX_INT4 } from '../lib/validation.js';
 
 function isValidCalendarDate(dateStr: string): boolean {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -21,7 +21,7 @@ const calendarDateSchema = isoDateSchema.refine(isValidCalendarDate, {
 const laporanQuerySchema = z.object({
   start_date: calendarDateSchema.optional(),
   end_date: calendarDateSchema.optional(),
-  id_bahan: z.coerce.number().int().positive().optional(),
+  id_bahan: z.coerce.number().int().min(1).max(MAX_INT4).optional(),
   weekend_mode: z
     .enum(['true', 'false'])
     .transform((v) => v === 'true')

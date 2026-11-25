@@ -20,7 +20,13 @@ import { bahan, detailTransaksi, pemasok, satuan, transaksi } from '../db/schema
 import { AppError } from '../lib/errors.js';
 import { roundQty, toNumber } from '../lib/numbers.js';
 import { todayWib } from '../lib/time.js';
-import { buildPagination, isoDateSchema, paginationQuerySchema } from '../lib/validation.js';
+import {
+  buildPagination,
+  isoDateSchema,
+  MAX_INT4,
+  MAX_NUMERIC_QTY,
+  paginationQuerySchema,
+} from '../lib/validation.js';
 
 function isValidCalendarDate(dateStr: string): boolean {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -33,24 +39,33 @@ const calendarDateSchema = isoDateSchema.refine(isValidCalendarDate, {
 });
 
 const detailMasukSchema = z.object({
-  id_bahan: z.coerce.number().int().positive('Bahan wajib dipilih.'),
-  jumlah: z.coerce.number().finite().positive('Jumlah bahan harus lebih besar dari nol.'),
-  harga_beli_satuan: z.coerce
+  id_bahan: z.number().int().min(1, 'Bahan wajib dipilih.').max(MAX_INT4),
+  jumlah: z
+    .number()
+    .finite()
+    .min(0.01, 'Jumlah bahan minimal 0.01.')
+    .max(MAX_NUMERIC_QTY, 'Jumlah bahan melebihi batas maksimal.'),
+  harga_beli_satuan: z
     .number()
     .int('Harga beli harus berupa bilangan bulat Rupiah.')
-    .positive('Harga beli harus lebih besar dari nol.'),
+    .min(1, 'Harga beli harus lebih besar dari nol.')
+    .max(MAX_INT4, 'Harga beli melebihi batas maksimal.'),
 });
 
 const detailKeluarSchema = z.object({
-  id_bahan: z.coerce.number().int().positive('Bahan wajib dipilih.'),
-  jumlah: z.coerce.number().finite().positive('Jumlah bahan harus lebih besar dari nol.'),
+  id_bahan: z.number().int().min(1, 'Bahan wajib dipilih.').max(MAX_INT4),
+  jumlah: z
+    .number()
+    .finite()
+    .min(0.01, 'Jumlah bahan minimal 0.01.')
+    .max(MAX_NUMERIC_QTY, 'Jumlah bahan melebihi batas maksimal.'),
   harga_beli_satuan: z.null().optional().default(null),
 });
 
 const masukTransactionSchema = z.object({
   waktu_transaksi: calendarDateSchema.optional(),
   jenis_transaksi: z.literal('masuk'),
-  id_pemasok: z.coerce.number().int().positive('Pemasok wajib dipilih.'),
+  id_pemasok: z.number().int().min(1, 'Pemasok wajib dipilih.').max(MAX_INT4),
   catatan: z.string().trim().max(500).optional().default(''),
   detail: z.array(detailMasukSchema).min(1, 'Minimal satu bahan harus dimasukkan.'),
 });
@@ -82,8 +97,8 @@ const createTransaksiSchema = z
 
 const listQuerySchema = paginationQuerySchema.extend({
   jenis_transaksi: z.enum(['masuk', 'keluar']).optional(),
-  id_pemasok: z.coerce.number().int().positive().optional(),
-  id_bahan: z.coerce.number().int().positive().optional(),
+  id_pemasok: z.coerce.number().int().min(1).max(MAX_INT4).optional(),
+  id_bahan: z.coerce.number().int().min(1).max(MAX_INT4).optional(),
   start_date: calendarDateSchema.optional(),
   end_date: calendarDateSchema.optional(),
   search: z.string().trim().optional(),
@@ -443,10 +458,12 @@ export function createTransaksiRouter(db: AppDb): Router {
     const idTransaksi = parsedId.data;
 
     await db.transaction(async (tx) => {
+      // Lock transaction header so concurrent DELETE requests cannot reverse stock twice.
       const [header] = await tx
         .select()
         .from(transaksi)
         .where(eq(transaksi.id_transaksi, idTransaksi))
+        .for('update')
         .limit(1);
 
       if (!header) {
@@ -458,6 +475,15 @@ export function createTransaksiRouter(db: AppDb): Router {
         .from(detailTransaksi)
         .where(eq(detailTransaksi.id_transaksi, idTransaksi))
         .orderBy(asc(detailTransaksi.id_bahan));
+
+      const [deletedHeader] = await tx
+        .delete(transaksi)
+        .where(eq(transaksi.id_transaksi, idTransaksi))
+        .returning({ id_transaksi: transaksi.id_transaksi });
+
+      if (!deletedHeader) {
+        throw new AppError(404, 'NOT_FOUND', 'Transaksi tidak ditemukan.');
+      }
 
       if (header.jenis_transaksi === 'masuk') {
         for (const item of details) {
@@ -483,6 +509,10 @@ export function createTransaksiRouter(db: AppDb): Router {
             );
           }
         }
+
+        for (const item of details) {
+          await refreshLatestPrice(tx, item.id_bahan);
+        }
       } else {
         for (const item of details) {
           await tx
@@ -492,14 +522,6 @@ export function createTransaksiRouter(db: AppDb): Router {
               updated_at: new Date(),
             })
             .where(eq(bahan.id_bahan, item.id_bahan));
-        }
-      }
-
-      await tx.delete(transaksi).where(eq(transaksi.id_transaksi, idTransaksi));
-
-      if (header.jenis_transaksi === 'masuk') {
-        for (const item of details) {
-          await refreshLatestPrice(tx, item.id_bahan);
         }
       }
     });

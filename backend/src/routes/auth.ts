@@ -22,7 +22,7 @@ const loginSchema = z.object({
 
 export function createAuthRouter(db: AppDb, config: AppConfig, requireAuth: RequestHandler): Router {
   const router = Router();
-  const isProd = config.nodeEnv === 'production';
+  const secureCookie = config.nodeEnv === 'production' || config.isVercel;
 
   router.post('/login', async (req, res) => {
     const { username, password } = loginSchema.parse(req.body);
@@ -56,7 +56,7 @@ export function createAuthRouter(db: AppDb, config: AppConfig, requireAuth: Requ
     const token = await signAuthToken(user.id_user, user.username, config.jwtSecret);
     res.cookie(SESSION_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: isProd,
+      secure: secureCookie,
       sameSite: 'lax',
       maxAge: TOKEN_MAX_AGE_SECONDS * 1000,
       path: '/',
@@ -77,7 +77,7 @@ export function createAuthRouter(db: AppDb, config: AppConfig, requireAuth: Requ
   router.post('/logout', (_req, res) => {
     res.clearCookie(SESSION_COOKIE_NAME, {
       httpOnly: true,
-      secure: isProd,
+      secure: secureCookie,
       sameSite: 'lax',
       path: '/',
     });

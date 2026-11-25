@@ -3,7 +3,7 @@ import cors from 'cors';
 import { sql } from 'drizzle-orm';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
-import type { AppConfig } from './config/env.js';
+import { normalizeOrigin, type AppConfig } from './config/env.js';
 import type { AppDb } from './db/client.js';
 import { registerDocsRoutes } from './docs/openapi.js';
 import { AppError } from './lib/errors.js';
@@ -23,16 +23,25 @@ export function createApp(db: AppDb, config: AppConfig): Express {
   app.set('trust proxy', 1);
 
   app.use(helmet());
+  const normalizedOrigins = config.allowedOrigins.map(normalizeOrigin);
   app.use(
-    cors({
-      origin(origin, callback) {
-        if (!origin || config.allowedOrigins.includes(origin)) {
-          callback(null, true);
-          return;
-        }
-        callback(new AppError(403, 'CORS_DENIED', 'Origin tidak diizinkan mengakses API.'));
-      },
-      credentials: true,
+    cors((req, callback) => {
+      const origin = req.headers.origin;
+      if (!origin) {
+        callback(null, { origin: true, credentials: true });
+        return;
+      }
+
+      const normalized = normalizeOrigin(origin);
+      const host = req.get('host');
+      const sameOrigin = host ? `${req.protocol}://${host}` : '';
+
+      if (normalized === sameOrigin || normalizedOrigins.includes(normalized)) {
+        callback(null, { origin: true, credentials: true });
+        return;
+      }
+
+      callback(new AppError(403, 'CORS_DENIED', 'Origin tidak diizinkan mengakses API.'));
     }),
   );
   app.use(cookieParser());

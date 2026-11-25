@@ -16,6 +16,19 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
+  if (err && typeof err === 'object') {
+    const httpErr = err as { status?: number; type?: string };
+    if (httpErr.status === 413 || httpErr.type === 'entity.too.large') {
+      res.status(413).json({
+        error: {
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Ukuran data request melebihi batas maksimal 100 KB.',
+        },
+      });
+      return;
+    }
+  }
+
   if (err instanceof SyntaxError && 'status' in err && (err as { status?: number }).status === 400) {
     res.status(400).json({
       error: {
@@ -70,6 +83,16 @@ export function errorHandler(
       error: {
         code: 'INVALID_REFERENCE',
         message: 'Referensi data terkait tidak ditemukan.',
+      },
+    });
+    return;
+  }
+
+  if (pgCode === '22003' || pgCode === '22P02' || pgCode === '23514') {
+    res.status(422).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Nilai angka atau format input berada di luar batas yang diizinkan.',
       },
     });
     return;
