@@ -10,7 +10,9 @@ import { createRequireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createBahanRouter } from './routes/bahan.js';
+import { createDashboardRouter } from './routes/dashboard.js';
 import { createKategoriRouter } from './routes/kategori.js';
+import { createLaporanRouter } from './routes/laporan.js';
 import { createPemasokRouter } from './routes/pemasok.js';
 import { createSatuanRouter } from './routes/satuan.js';
 import { createTransaksiRouter } from './routes/transaksi.js';
@@ -54,6 +56,8 @@ export function createApp(db: AppDb, config: AppConfig): Express {
   app.use('/api/pemasok', requireAuth, createPemasokRouter(db));
   app.use('/api/bahan', requireAuth, createBahanRouter(db));
   app.use('/api/transaksi', requireAuth, createTransaksiRouter(db));
+  app.use('/api/dashboard', requireAuth, createDashboardRouter(db));
+  app.use('/api/laporan', requireAuth, createLaporanRouter(db));
 
   app.use((_req, _res, next) => {
     next(new AppError(404, 'NOT_FOUND', 'Endpoint tidak ditemukan.'));
