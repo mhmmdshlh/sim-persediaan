@@ -3,6 +3,9 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { DashboardPage } from "@/pages/dashboard";
 import { BahanPage } from "@/pages/bahan";
+import { KategoriPage } from "@/pages/kategori";
+import { SatuanPage } from "@/pages/satuan";
+import { PemasokPage } from "@/pages/pemasok";
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -24,17 +27,11 @@ function App() {
 
           <Route path="bahan" element={<BahanPage />} />
 
-          <Route
-            path="kategori"
-            element={<PlaceholderPage title="Kategori Bahan" />}
-          />
+          <Route path="kategori" element={<KategoriPage />} />
 
-          <Route path="satuan" element={<PlaceholderPage title="Satuan" />} />
+          <Route path="satuan" element={<SatuanPage />} />
 
-          <Route
-            path="pemasok"
-            element={<PlaceholderPage title="Data Pemasok" />}
-          />
+          <Route path="pemasok" element={<PemasokPage />} />
 
           <Route
             path="transaksi/masuk"
