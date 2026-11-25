@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Menu } from "lucide-react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
+import { LogOut, Menu } from "lucide-react";
+import { useAuth } from "@/contexts/use-auth"
 
 import { AppSidebar } from "./app-sidebar";
 
@@ -14,6 +15,18 @@ import {
 
 export function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch {
+      // Status pengguna tetap dihapus oleh AuthContext.
+    }
+
+    navigate("/login", { replace: true });
+  }
 
   return (
     <div className="min-h-svh bg-muted/30">
@@ -57,8 +70,25 @@ export function AppLayout() {
           </div>
 
           {/* User Profile */}
-          <div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-            PW
+          <div className="flex items-center gap-2">
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-medium">{user?.nama}</p>
+              <p className="text-xs text-muted-foreground">{user?.username}</p>
+            </div>
+
+            <div className="flex size-9 items-center justify-center rounded-full bg-muted text-sm font-semibold">
+              {user?.nama.charAt(0).toUpperCase()}
+            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => void handleLogout()}
+              aria-label="Keluar dari sistem"
+              title="Logout"
+            >
+              <LogOut className="size-4" />
+            </Button>
           </div>
         </header>
 

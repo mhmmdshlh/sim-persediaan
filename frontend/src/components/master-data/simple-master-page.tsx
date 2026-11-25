@@ -1,4 +1,4 @@
-import { useState, type SubmitEvent } from "react"
+import { useEffect, useState, type SubmitEvent } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,30 +21,60 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export interface SimpleMasterItem {
-  id: number;
-  name: string;
-}
+import type { MasterDataItem } from "@/types/master-data";
 
 interface SimpleMasterPageProps {
   title: string;
   description: string;
   itemLabel: string;
-  initialItems: SimpleMasterItem[];
+  loadItems: () => Promise<MasterDataItem[]>;
+  createItem: (name: string) => Promise<MasterDataItem>;
+  updateItem: (id: number, name: string) => Promise<MasterDataItem>;
+  deleteItem: (id: number) => Promise<void>;
 }
 
 export function SimpleMasterPage({
   title,
   description,
   itemLabel,
-  initialItems,
+  loadItems,
+  createItem,
+  updateItem,
+  deleteItem,
 }: SimpleMasterPageProps) {
-  const [items, setItems] = useState<SimpleMasterItem[]>(initialItems);
+  const [items, setItems] = useState<MasterDataItem[]>([]);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
-  const [error, setError] = useState("");
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    let isActive = true;
+
+    void loadItems()
+      .then((data) => {
+        if (isActive) setItems(data);
+      })
+      .catch((error: unknown) => {
+        if (isActive) {
+          setPageError(
+            error instanceof Error ? error.message : "Gagal mengambil data.",
+          );
+        }
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [loadItems]);
 
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase()),
@@ -53,24 +83,24 @@ export function SimpleMasterPage({
   function openCreateDialog() {
     setEditingId(null);
     setName("");
-    setError("");
+    setFormError("");
     setDialogOpen(true);
   }
 
-  function openEditDialog(item: SimpleMasterItem) {
+  function openEditDialog(item: MasterDataItem) {
     setEditingId(item.id);
     setName(item.name);
-    setError("");
+    setFormError("");
     setDialogOpen(true);
   }
 
-  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedName = name.trim();
 
     if (!trimmedName) {
-      setError(`Nama ${itemLabel.toLowerCase()} wajib diisi.`);
+      setFormError(`Nama ${itemLabel.toLowerCase()} wajib diisi.`);
       return;
     }
 
@@ -81,38 +111,63 @@ export function SimpleMasterPage({
     );
 
     if (duplicate) {
-      setError(`${itemLabel} tersebut sudah terdaftar.`);
+      setFormError(`${itemLabel} tersebut sudah terdaftar.`);
       return;
     }
 
-    if (editingId !== null) {
-      setItems((current) =>
-        current.map((item) =>
-          item.id === editingId ? { ...item, name: trimmedName } : item,
-        ),
+    setIsSaving(true);
+    setFormError("");
+    setPageError("");
+
+    try {
+      if (editingId !== null) {
+        const updated = await updateItem(editingId, trimmedName);
+
+        setItems((current) =>
+          current.map((item) => (item.id === editingId ? updated : item)),
+        );
+      } else {
+        const created = await createItem(trimmedName);
+
+        setItems((current) => [...current, created]);
+      }
+
+      setDialogOpen(false);
+      setName("");
+      setEditingId(null);
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : `Gagal menyimpan ${itemLabel.toLowerCase()}.`,
       );
-    } else {
-      setItems((current) => {
-        const nextId =
-          current.reduce((maximum, item) => Math.max(maximum, item.id), 0) + 1;
-
-        return [...current, { id: nextId, name: trimmedName }];
-      });
+    } finally {
+      setIsSaving(false);
     }
-
-    setDialogOpen(false);
   }
 
-  function handleDelete(item: SimpleMasterItem) {
+  async function handleDelete(item: MasterDataItem) {
     const confirmed = window.confirm(
       `Hapus ${itemLabel.toLowerCase()} "${item.name}"?`,
     );
 
     if (!confirmed) return;
 
-    setItems((current) =>
-      current.filter((currentItem) => currentItem.id !== item.id),
-    );
+    setPageError("");
+
+    try {
+      await deleteItem(item.id);
+
+      setItems((current) =>
+        current.filter((currentItem) => currentItem.id !== item.id),
+      );
+    } catch (error) {
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : `Gagal menghapus ${itemLabel.toLowerCase()}.`,
+      );
+    }
   }
 
   return (
@@ -121,6 +176,15 @@ export function SimpleMasterPage({
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
+
+      {pageError && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+        >
+          {pageError}
+        </div>
+      )}
 
       <Card>
         <CardContent className="space-y-4 pt-6">
@@ -152,7 +216,16 @@ export function SimpleMasterPage({
               </TableHeader>
 
               <TableBody>
-                {filteredItems.length > 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Memuat data...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredItems.length > 0 ? (
                   filteredItems.map((item, index) => (
                     <TableRow key={item.id}>
                       <TableCell>{index + 1}</TableCell>
@@ -172,7 +245,7 @@ export function SimpleMasterPage({
                             variant="ghost"
                             size="icon"
                             aria-label={`Hapus ${item.name}`}
-                            onClick={() => handleDelete(item)}
+                            onClick={() => void handleDelete(item)}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -222,15 +295,16 @@ export function SimpleMasterPage({
                 value={name}
                 onChange={(event) => {
                   setName(event.target.value);
-                  setError("");
+                  setFormError("");
                 }}
                 placeholder={`Masukkan nama ${itemLabel.toLowerCase()}`}
                 required
+                disabled={isSaving}
               />
 
-              {error && (
+              {formError && (
                 <p className="text-sm text-destructive" role="alert">
-                  {error}
+                  {formError}
                 </p>
               )}
             </div>
@@ -239,12 +313,15 @@ export function SimpleMasterPage({
               <Button
                 type="button"
                 variant="outline"
+                disabled={isSaving}
                 onClick={() => setDialogOpen(false)}
               >
                 Batal
               </Button>
 
-              <Button type="submit">Simpan</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? "Menyimpan..." : "Simpan"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
