@@ -1,8 +1,7 @@
 
-import { useState, type SubmitEvent} from "react"
+import { useEffect, useState, type SubmitEvent } from "react"
 import { Pencil, Plus, Search, Trash2 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -26,16 +25,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import type { Pemasok, PemasokFormValues } from "@/types/pemasok"
+import { ApiError } from "@/services/api"
+import {
+  createPemasok,
+  deletePemasok,
+  getPemasokList,
+  updatePemasok,
+} from "@/services/pemasok-service"
 
-const INITIAL_PEMASOK: Pemasok[] = [
-  {
-    id_pemasok: 1,
-    nama_pemasok: "Pemasok Contoh",
-    no_telepon: "08xxxxxxxxxx",
-    alamat: "Alamat contoh, Semarang",
-  },
-]
+import type { Pemasok, PemasokFormValues } from "@/types/pemasok"
 
 const EMPTY_FORM: PemasokFormValues = {
   nama_pemasok: "",
@@ -43,30 +41,71 @@ const EMPTY_FORM: PemasokFormValues = {
   alamat: "",
 }
 
-export function PemasokPage() {
-  const [pemasokList, setPemasokList] =
-    useState<Pemasok[]>(INITIAL_PEMASOK)
+function getErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message
+  }
 
+  return "Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi."
+}
+
+function matchesSearch(pemasok: Pemasok, search: string): boolean {
+  const query = search.trim().toLowerCase()
+
+  if (!query) return true
+
+  return (
+    pemasok.nama_pemasok.toLowerCase().includes(query) ||
+    pemasok.no_telepon.toLowerCase().includes(query) ||
+    pemasok.alamat.toLowerCase().includes(query)
+  )
+}
+
+export function PemasokPage() {
+  const [pemasokList, setPemasokList] = useState<Pemasok[]>([])
   const [search, setSearch] = useState("")
+  const [loadedSearch, setLoadedSearch] = useState<string | null>(null)
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState<PemasokFormValues>({ ...EMPTY_FORM })
-  const [error, setError] = useState("")
 
-  const filteredPemasok = pemasokList.filter((pemasok) => {
-    const query = search.toLowerCase()
+  const [formError, setFormError] = useState("")
+  const [pageError, setPageError] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
-    return (
-      pemasok.nama_pemasok.toLowerCase().includes(query) ||
-      pemasok.no_telepon.toLowerCase().includes(query) ||
-      pemasok.alamat.toLowerCase().includes(query)
-    )
-  })
+  const isLoading = loadedSearch !== search
+
+  // Mengambil data dari backend setiap kali kata pencarian berubah.
+  useEffect(() => {
+    let isActive = true
+
+    getPemasokList(search)
+      .then((data) => {
+        if (!isActive) return
+
+        setPemasokList(data)
+        setPageError("")
+        setLoadedSearch(search)
+      })
+      .catch((error: unknown) => {
+        if (!isActive) return
+
+        setPemasokList([])
+        setPageError(getErrorMessage(error))
+        setLoadedSearch(search)
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [search])
 
   function openCreateDialog() {
     setEditingId(null)
     setForm({ ...EMPTY_FORM })
-    setError("")
+    setFormError("")
     setDialogOpen(true)
   }
 
@@ -79,96 +118,113 @@ export function PemasokPage() {
       alamat: pemasok.alamat,
     })
 
-    setError("")
+    setFormError("")
     setDialogOpen(true)
   }
 
-  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const namaPemasok = form.nama_pemasok.trim()
-
-    if (!namaPemasok) {
-      setError("Nama pemasok wajib diisi.")
-      return
-    }
-
-    const duplicate = pemasokList.some(
-      (pemasok) =>
-        pemasok.id_pemasok !== editingId &&
-        pemasok.nama_pemasok.toLowerCase() === namaPemasok.toLowerCase(),
-    )
-
-    if (duplicate) {
-      setError("Nama pemasok sudah terdaftar.")
-      return
-    }
-
     const payload: PemasokFormValues = {
-      nama_pemasok: namaPemasok,
+      nama_pemasok: form.nama_pemasok.trim(),
       no_telepon: form.no_telepon.trim(),
       alamat: form.alamat.trim(),
     }
 
-    if (editingId !== null) {
-      setPemasokList((current) =>
-        current.map((pemasok) =>
-          pemasok.id_pemasok === editingId
-            ? { ...pemasok, ...payload }
-            : pemasok,
-        ),
-      )
-    } else {
-      setPemasokList((current) => {
-        const nextId =
-          current.reduce(
-            (maximum, pemasok) =>
-              Math.max(maximum, pemasok.id_pemasok),
-            0,
-          ) + 1
-
-        return [
-          ...current,
-          {
-            id_pemasok: nextId,
-            ...payload,
-          },
-        ]
-      })
+    if (!payload.nama_pemasok) {
+      setFormError("Nama pemasok wajib diisi.")
+      return
     }
 
-    setDialogOpen(false)
-    setEditingId(null)
-    setForm({ ...EMPTY_FORM })
+    setIsSaving(true)
+    setFormError("")
+
+    try {
+      if (editingId !== null) {
+        const updated = await updatePemasok(editingId, payload)
+
+        setPemasokList((current) => {
+          const remaining = current.filter(
+            (item) => item.id_pemasok !== updated.id_pemasok,
+          )
+
+          if (!matchesSearch(updated, search)) {
+            return remaining
+          }
+
+          return [...remaining, updated].sort(
+            (a, b) => a.id_pemasok - b.id_pemasok,
+          )
+        })
+      } else {
+        const created = await createPemasok(payload)
+
+        setPemasokList((current) => {
+          if (!matchesSearch(created, search)) {
+            return current
+          }
+
+          return [...current, created].sort(
+            (a, b) => a.id_pemasok - b.id_pemasok,
+          )
+        })
+      }
+
+      setDialogOpen(false)
+      setEditingId(null)
+      setForm({ ...EMPTY_FORM })
+    } catch (error: unknown) {
+      setFormError(getErrorMessage(error))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  function handleDelete(pemasok: Pemasok) {
+  async function handleDelete(pemasok: Pemasok) {
     const confirmed = window.confirm(
       `Hapus pemasok "${pemasok.nama_pemasok}"?`,
     )
 
     if (!confirmed) return
 
-    setPemasokList((current) =>
-      current.filter(
-        (item) => item.id_pemasok !== pemasok.id_pemasok,
-      ),
-    )
+    setPageError("")
+    setDeletingId(pemasok.id_pemasok)
+
+    try {
+      await deletePemasok(pemasok.id_pemasok)
+
+      setPemasokList((current) =>
+        current.filter(
+          (item) => item.id_pemasok !== pemasok.id_pemasok,
+        ),
+      )
+    } catch (error: unknown) {
+      setPageError(getErrorMessage(error))
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
+      <div>
         <h1 className="text-2xl font-bold tracking-tight">
           Data Pemasok
         </h1>
 
-        <Badge variant="outline">Data contoh</Badge>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Kelola informasi pemasok bahan baku dan bahan kemasan.
+        </p>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Kelola informasi pemasok bahan baku dan bahan kemasan.
-      </p>
+      {pageError && (
+        <div
+          className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          role="alert"
+        >
+          {pageError}
+        </div>
+      )}
 
       <Card>
         <CardContent className="space-y-4 pt-6">
@@ -178,7 +234,10 @@ export function PemasokPage() {
 
               <Input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value)
+                  setPageError("")
+                }}
                 placeholder="Cari pemasok..."
                 className="pl-9"
               />
@@ -202,8 +261,17 @@ export function PemasokPage() {
               </TableHeader>
 
               <TableBody>
-                {filteredPemasok.length > 0 ? (
-                  filteredPemasok.map((pemasok) => (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Memuat data pemasok...
+                    </TableCell>
+                  </TableRow>
+                ) : pemasokList.length > 0 ? (
+                  pemasokList.map((pemasok) => (
                     <TableRow key={pemasok.id_pemasok}>
                       <TableCell className="font-medium">
                         {pemasok.nama_pemasok}
@@ -224,6 +292,7 @@ export function PemasokPage() {
                             size="icon"
                             aria-label={`Edit ${pemasok.nama_pemasok}`}
                             onClick={() => openEditDialog(pemasok)}
+                            disabled={deletingId !== null}
                           >
                             <Pencil className="size-4" />
                           </Button>
@@ -233,6 +302,7 @@ export function PemasokPage() {
                             size="icon"
                             aria-label={`Hapus ${pemasok.nama_pemasok}`}
                             onClick={() => handleDelete(pemasok)}
+                            disabled={deletingId !== null}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -246,7 +316,11 @@ export function PemasokPage() {
                       colSpan={4}
                       className="h-24 text-center text-muted-foreground"
                     >
-                      Tidak ada pemasok ditemukan.
+                      {pageError
+                        ? "Data pemasok tidak dapat dimuat."
+                        : search.trim()
+                          ? "Tidak ada pemasok yang cocok dengan pencarian."
+                          : "Belum ada data pemasok."}
                     </TableCell>
                   </TableRow>
                 )}
@@ -255,12 +329,17 @@ export function PemasokPage() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Menampilkan {filteredPemasok.length} dari {pemasokList.length} pemasok.
+            Menampilkan {pemasokList.length} pemasok.
           </p>
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!isSaving) setDialogOpen(open)
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -274,7 +353,10 @@ export function PemasokPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="nama_pemasok" className="text-sm font-medium">
+              <label
+                htmlFor="nama_pemasok"
+                className="text-sm font-medium"
+              >
                 Nama Pemasok
               </label>
 
@@ -286,15 +368,19 @@ export function PemasokPage() {
                     ...current,
                     nama_pemasok: event.target.value,
                   }))
-                  setError("")
+                  setFormError("")
                 }}
                 placeholder="Masukkan nama pemasok"
+                maxLength={120}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="no_telepon" className="text-sm font-medium">
+              <label
+                htmlFor="no_telepon"
+                className="text-sm font-medium"
+              >
                 Nomor Telepon
               </label>
 
@@ -309,11 +395,15 @@ export function PemasokPage() {
                   }))
                 }
                 placeholder="Masukkan nomor telepon"
+                maxLength={30}
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="alamat" className="text-sm font-medium">
+              <label
+                htmlFor="alamat"
+                className="text-sm font-medium"
+              >
                 Alamat
               </label>
 
@@ -328,13 +418,14 @@ export function PemasokPage() {
                 }
                 placeholder="Masukkan alamat pemasok"
                 rows={3}
+                maxLength={500}
                 className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               />
             </div>
 
-            {error && (
+            {formError && (
               <p className="text-sm text-destructive" role="alert">
-                {error}
+                {formError}
               </p>
             )}
 
@@ -343,12 +434,13 @@ export function PemasokPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
+                disabled={isSaving}
               >
                 Batal
               </Button>
 
-              <Button type="submit">
-                Simpan
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? "Menyimpan..." : "Simpan"}
               </Button>
             </DialogFooter>
           </form>

@@ -1,13 +1,9 @@
+import { useEffect, useState, type SubmitEvent } from "react";
+import { Pencil, Plus, Search } from "lucide-react";
 
-import { useState, type FormEvent } from "react"
-import { Pencil, Plus, Search } from "lucide-react"
-
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -15,16 +11,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -32,203 +27,236 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 
-import type { Bahan, BahanFormValues } from "@/types/bahan"
+import {
+  createBahan,
+  deactivateBahan,
+  getBahanList,
+  updateBahan,
+} from "@/services/bahan-service";
+import { getKategoriList } from "@/services/kategori-service";
+import { getSatuanList } from "@/services/satuan-service";
 
-const KATEGORI = [
-  { id: 1, nama: "Bahan utama" },
-  { id: 2, nama: "Bumbu" },
-  { id: 3, nama: "Bahan kemasan" },
-]
+import type {
+  Bahan,
+  BahanFormValues,
+  BahanPayload,
+  StatusStok,
+} from "@/types/bahan";
 
-const SATUAN = [
-  { id: 1, nama: "kg" },
-  { id: 2, nama: "gram" },
-  { id: 3, nama: "liter" },
-  { id: 4, nama: "buah" },
-]
-
-const INITIAL_BAHAN: Bahan[] = [
-  {
-    id_bahan: 1,
-    nama_bahan: "Ayam",
-    id_kategori: 1,
-    id_satuan: 1,
-    stok_minimum: 5,
-    aktif: true,
-  },
-  {
-    id_bahan: 2,
-    nama_bahan: "Telur",
-    id_kategori: 1,
-    id_satuan: 1,
-    stok_minimum: 2,
-    aktif: true,
-  },
-  {
-    id_bahan: 3,
-    nama_bahan: "Cabai",
-    id_kategori: 2,
-    id_satuan: 1,
-    stok_minimum: 1,
-    aktif: true,
-  },
-  {
-    id_bahan: 4,
-    nama_bahan: "Minyak Goreng",
-    id_kategori: 1,
-    id_satuan: 3,
-    stok_minimum: 2,
-    aktif: true,
-  },
-  {
-    id_bahan: 5,
-    nama_bahan: "Lunch Box",
-    id_kategori: 3,
-    id_satuan: 4,
-    stok_minimum: 50,
-    aktif: true,
-  },
-]
+import type { MasterDataItem } from "@/types/master-data";
 
 const EMPTY_FORM: BahanFormValues = {
   nama_bahan: "",
   id_kategori: "",
   id_satuan: "",
   stok_minimum: "",
+};
+
+const STOCK_STATUS_LABEL: Record<StatusStok, string> = {
+  HABIS: "Habis",
+  MENIPIS: "Menipis",
+  AMAN: "Aman",
+};
+
+function getStockStatusClass(status: StatusStok): string {
+  switch (status) {
+    case "HABIS":
+      return "border-red-300 bg-red-50 text-red-700";
+    case "MENIPIS":
+      return "border-amber-300 bg-amber-50 text-amber-700";
+    case "AMAN":
+      return "border-emerald-300 bg-emerald-50 text-emerald-700";
+  }
 }
 
-const kategoriItems = KATEGORI.map((kategori) => ({
-  label: kategori.nama,
-  value: String(kategori.id),
-}))
-
-const satuanItems = SATUAN.map((satuan) => ({
-  label: satuan.nama,
-  value: String(satuan.id),
-}))
-
 export function BahanPage() {
-  const [bahanList, setBahanList] = useState<Bahan[]>(INITIAL_BAHAN)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [form, setForm] = useState<BahanFormValues>({ ...EMPTY_FORM })
+  const [bahanList, setBahanList] = useState<Bahan[]>([]);
+  const [kategoriList, setKategoriList] = useState<MasterDataItem[]>([]);
+  const [satuanList, setSatuanList] = useState<MasterDataItem[]>([]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const [form, setForm] = useState<BahanFormValues>({ ...EMPTY_FORM });
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    let isActive = true;
+
+    void Promise.all([getBahanList(), getKategoriList(), getSatuanList()])
+      .then(([bahan, kategori, satuan]) => {
+        if (!isActive) return;
+
+        setBahanList(bahan);
+        setKategoriList(kategori);
+        setSatuanList(satuan);
+      })
+      .catch((error: unknown) => {
+        if (!isActive) return;
+
+        setPageError(
+          error instanceof Error
+            ? error.message
+            : "Gagal mengambil data master.",
+        );
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const filteredBahan = bahanList.filter((bahan) =>
     bahan.nama_bahan.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  );
 
-  function getKategoriName(id: number) {
-    return KATEGORI.find((kategori) => kategori.id === id)?.nama ?? "-"
-  }
+  const kategoriItems = kategoriList.map((kategori) => ({
+    label: kategori.name,
+    value: String(kategori.id),
+  }));
 
-  function getSatuanName(id: number) {
-    return SATUAN.find((satuan) => satuan.id === id)?.nama ?? "-"
-  }
+  const satuanItems = satuanList.map((satuan) => ({
+    label: satuan.name,
+    value: String(satuan.id),
+  }));
 
   function openCreateDialog() {
-    setEditingId(null)
-    setForm({ ...EMPTY_FORM })
-    setDialogOpen(true)
+    setEditingId(null);
+    setForm({ ...EMPTY_FORM });
+    setFormError("");
+    setDialogOpen(true);
   }
 
   function openEditDialog(bahan: Bahan) {
-    setEditingId(bahan.id_bahan)
+    setEditingId(bahan.id_bahan);
 
     setForm({
       nama_bahan: bahan.nama_bahan,
       id_kategori: String(bahan.id_kategori),
       id_satuan: String(bahan.id_satuan),
       stok_minimum: String(bahan.stok_minimum),
-    })
+    });
 
-    setDialogOpen(true)
+    setFormError("");
+    setDialogOpen(true);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError("");
 
-    const namaBahan = form.nama_bahan.trim()
-    const stokMinimum = Number(form.stok_minimum)
+    const namaBahan = form.nama_bahan.trim();
+    const stokMinimum = Number(form.stok_minimum);
+    const idKategori = Number(form.id_kategori);
+    const idSatuan = Number(form.id_satuan);
 
     if (
       !namaBahan ||
       !form.id_kategori ||
       !form.id_satuan ||
-      form.stok_minimum.trim() === "" ||
+      !form.stok_minimum.trim() ||
+      !Number.isSafeInteger(idKategori) ||
+      !Number.isSafeInteger(idSatuan) ||
       !Number.isFinite(stokMinimum) ||
       stokMinimum < 0
     ) {
-      return
+      setFormError("Periksa kembali seluruh input yang diwajibkan.");
+      return;
     }
 
-    const payload = {
+    const payload: BahanPayload = {
       nama_bahan: namaBahan,
-      id_kategori: Number(form.id_kategori),
-      id_satuan: Number(form.id_satuan),
+      id_kategori: idKategori,
+      id_satuan: idSatuan,
       stok_minimum: stokMinimum,
+    };
+
+    setIsSaving(true);
+
+    try {
+      if (editingId !== null) {
+        const updated = await updateBahan(editingId, payload);
+
+        setBahanList((current) =>
+          current.map((item) => (item.id_bahan === editingId ? updated : item)),
+        );
+      } else {
+        const created = await createBahan(payload);
+
+        setBahanList((current) =>
+          [...current, created].sort((a, b) => a.id_bahan - b.id_bahan),
+        );
+      }
+
+      setDialogOpen(false);
+      setEditingId(null);
+      setForm({ ...EMPTY_FORM });
+    } catch (error) {
+      setFormError(
+        error instanceof Error ? error.message : "Gagal menyimpan data bahan.",
+      );
+    } finally {
+      setIsSaving(false);
     }
-
-    if (editingId !== null) {
-      setBahanList((current) =>
-        current.map((bahan) =>
-          bahan.id_bahan === editingId
-            ? { ...bahan, ...payload }
-            : bahan,
-        ),
-      )
-    } else {
-      setBahanList((current) => {
-        const nextId =
-          current.reduce(
-            (maximum, bahan) => Math.max(maximum, bahan.id_bahan),
-            0,
-          ) + 1
-
-        return [
-          ...current,
-          {
-            id_bahan: nextId,
-            ...payload,
-            aktif: true,
-          },
-        ]
-      })
-    }
-
-    setDialogOpen(false)
-    setEditingId(null)
-    setForm({ ...EMPTY_FORM })
   }
 
-  function toggleActive(id: number) {
-    setBahanList((current) =>
-      current.map((bahan) =>
-        bahan.id_bahan === id
-          ? { ...bahan, aktif: !bahan.aktif }
-          : bahan,
-      ),
-    )
+  async function handleToggleActive(bahan: Bahan) {
+    if (
+      bahan.aktif &&
+      !window.confirm(`Nonaktifkan bahan "${bahan.nama_bahan}"?`)
+    ) {
+      return;
+    }
+
+    setPageError("");
+
+    try {
+      const updated = bahan.aktif
+        ? await deactivateBahan(bahan.id_bahan)
+        : await updateBahan(bahan.id_bahan, { aktif: true });
+
+      setBahanList((current) =>
+        current.map((item) =>
+          item.id_bahan === updated.id_bahan ? updated : item,
+        ),
+      );
+    } catch (error) {
+      setPageError(
+        error instanceof Error ? error.message : "Gagal mengubah status bahan.",
+      );
+    }
   }
 
   return (
     <div className="space-y-6">
-      {/* Page Heading */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Data Bahan
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">Data Bahan</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Kelola daftar bahan baku dan bahan kemasan.
         </p>
       </div>
 
-      {/* Table Container */}
+      {pageError && (
+        <div
+          className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+          role="alert"
+        >
+          {pageError}
+        </div>
+      )}
+
       <Card>
         <CardContent className="space-y-4 pt-6">
-          {/* Search and Add Button */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -247,7 +275,6 @@ export function BahanPage() {
             </Button>
           </div>
 
-          {/* Data Table */}
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
@@ -255,36 +282,54 @@ export function BahanPage() {
                   <TableHead>Nama Bahan</TableHead>
                   <TableHead>Kategori</TableHead>
                   <TableHead>Satuan</TableHead>
+                  <TableHead>Stok</TableHead>
                   <TableHead>Stok Minimum</TableHead>
+                  <TableHead>Kondisi Stok</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
 
               <TableBody>
-                {filteredBahan.length > 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Memuat data bahan...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredBahan.length > 0 ? (
                   filteredBahan.map((bahan) => (
                     <TableRow key={bahan.id_bahan}>
                       <TableCell className="font-medium">
                         {bahan.nama_bahan}
                       </TableCell>
 
+                      <TableCell>{bahan.nama_kategori}</TableCell>
+
+                      <TableCell>{bahan.nama_satuan}</TableCell>
+
                       <TableCell>
-                        {getKategoriName(bahan.id_kategori)}
+                        {bahan.stok_saat_ini} {bahan.nama_satuan}
                       </TableCell>
 
                       <TableCell>
-                        {getSatuanName(bahan.id_satuan)}
-                      </TableCell>
-
-                      <TableCell>
-                        {bahan.stok_minimum}
+                        {bahan.stok_minimum} {bahan.nama_satuan}
                       </TableCell>
 
                       <TableCell>
                         <Badge
-                          variant={bahan.aktif ? "default" : "secondary"}
+                          variant="outline"
+                          className={getStockStatusClass(bahan.status)}
                         >
+                          {STOCK_STATUS_LABEL[bahan.status]}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        <Badge variant={bahan.aktif ? "default" : "secondary"}>
                           {bahan.aktif ? "Aktif" : "Nonaktif"}
                         </Badge>
                       </TableCell>
@@ -303,7 +348,7 @@ export function BahanPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => toggleActive(bahan.id_bahan)}
+                            onClick={() => void handleToggleActive(bahan)}
                           >
                             {bahan.aktif ? "Nonaktifkan" : "Aktifkan"}
                           </Button>
@@ -314,7 +359,7 @@ export function BahanPage() {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={8}
                       className="h-24 text-center text-muted-foreground"
                     >
                       Tidak ada bahan ditemukan.
@@ -331,7 +376,6 @@ export function BahanPage() {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
@@ -361,6 +405,7 @@ export function BahanPage() {
                 }
                 placeholder="Contoh: Ayam"
                 required
+                disabled={isSaving}
               />
             </div>
 
@@ -384,13 +429,11 @@ export function BahanPage() {
                 </SelectTrigger>
 
                 <SelectContent>
-                  <SelectGroup>
-                    {kategoriItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
+                  {kategoriItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -415,13 +458,11 @@ export function BahanPage() {
                 </SelectTrigger>
 
                 <SelectContent>
-                  <SelectGroup>
-                    {satuanItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
+                  {satuanItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -445,25 +486,37 @@ export function BahanPage() {
                 }
                 placeholder="Contoh: 5"
                 required
+                disabled={isSaving}
               />
             </div>
+
+            {formError && (
+              <p className="text-sm text-destructive" role="alert">
+                {formError}
+              </p>
+            )}
 
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
+                disabled={isSaving}
               >
                 Batal
               </Button>
 
-              <Button type="submit">
-                {editingId !== null ? "Simpan Perubahan" : "Simpan Bahan"}
+              <Button type="submit" disabled={isSaving}>
+                {isSaving
+                  ? "Menyimpan..."
+                  : editingId !== null
+                    ? "Simpan Perubahan"
+                    : "Simpan Bahan"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

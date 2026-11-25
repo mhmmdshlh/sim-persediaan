@@ -1,13 +1,10 @@
+import { SimpleMasterPage } from "@/components/master-data/simple-master-page"
 import {
-  SimpleMasterPage,
-  type SimpleMasterItem,
-} from "@/components/master-data/simple-master-page"
-
-const initialCategories: SimpleMasterItem[] = [
-  { id: 1, name: "Bahan Utama" },
-  { id: 2, name: "Bumbu" },
-  { id: 3, name: "Bahan Kemasan" },
-]
+  createKategori,
+  deleteKategori,
+  getKategoriList,
+  updateKategori,
+} from "@/services/kategori-service"
 
 export function KategoriPage() {
   return (
@@ -15,7 +12,10 @@ export function KategoriPage() {
       title="Kategori Bahan"
       description="Kelola kategori pengelompokan bahan."
       itemLabel="Kategori"
-      initialItems={initialCategories}
+      loadItems={getKategoriList}
+      createItem={createKategori}
+      updateItem={updateKategori}
+      deleteItem={deleteKategori}
     />
   )
 }

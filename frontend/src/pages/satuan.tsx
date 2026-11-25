@@ -1,14 +1,10 @@
+import { SimpleMasterPage } from "@/components/master-data/simple-master-page"
 import {
-  SimpleMasterPage,
-  type SimpleMasterItem,
-} from "@/components/master-data/simple-master-page"
-
-const initialUnits: SimpleMasterItem[] = [
-  { id: 1, name: "Kilogram (kg)" },
-  { id: 2, name: "Gram (g)" },
-  { id: 3, name: "Liter (L)" },
-  { id: 4, name: "Buah" },
-]
+  createSatuan,
+  deleteSatuan,
+  getSatuanList,
+  updateSatuan,
+} from "@/services/satuan-service"
 
 export function SatuanPage() {
   return (
@@ -16,7 +12,10 @@ export function SatuanPage() {
       title="Satuan Bahan"
       description="Kelola satuan pengukuran bahan."
       itemLabel="Satuan"
-      initialItems={initialUnits}
+      loadItems={getSatuanList}
+      createItem={createSatuan}
+      updateItem={updateSatuan}
+      deleteItem={deleteSatuan}
     />
   )
 }
