@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express, { type Express } from 'express';
-import { createApp } from './app.js';
+import { createApp } from './create-app.js';
 import { parseEnv } from './config/env.js';
 import { bootstrapSchema } from './db/bootstrap.js';
 import { createDbClient } from './db/client.js';

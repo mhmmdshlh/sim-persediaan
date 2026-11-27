@@ -1,8 +1,11 @@
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { sql } from 'drizzle-orm';
-import express, { type Express } from 'express';
-import helmet from 'helmet';
+import express, {
+  type Express,
+  type RequestHandler,
+} from 'express';
+import { createRequire } from 'node:module';
 import { normalizeOrigin, type AppConfig } from './config/env.js';
 import type { AppDb } from './db/client.js';
 import { registerDocsRoutes } from './docs/openapi.js';
@@ -17,6 +20,9 @@ import { createLaporanRouter } from './routes/laporan.js';
 import { createPemasokRouter } from './routes/pemasok.js';
 import { createSatuanRouter } from './routes/satuan.js';
 import { createTransaksiRouter } from './routes/transaksi.js';
+
+const require = createRequire(import.meta.url);
+const helmet = require('helmet') as () => RequestHandler;
 
 export function createApp(db: AppDb, config: AppConfig): Express {
   const app = express();
