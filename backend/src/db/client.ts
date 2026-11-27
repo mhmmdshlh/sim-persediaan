@@ -25,14 +25,15 @@ export function createPgPool(databaseUrl: string, isVercel = false): pg.Pool {
     max: isVercel ? 5 : 10,
     idleTimeoutMillis: isVercel ? 10_000 : 30_000,
     connectionTimeoutMillis: 10_000,
-  });
+    enableChannelBinding: true,
+  })
 
   // Prevent unhandled pool errors when Neon auto-suspends idle connections.
-  pool.on('error', (err) => {
-    console.error('[pg-pool-error]', err);
-  });
+  pool.on("error", (err) => {
+    console.error("[pg-pool-error]", err)
+  })
 
-  return pool;
+  return pool
 }
 
 // Source: https://orm.drizzle.team/docs/get-started-postgresql and https://orm.drizzle.team/docs/connect-pglite
