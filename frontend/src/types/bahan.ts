@@ -1,4 +1,4 @@
-export type StatusStok = "HABIS" | "MENIPIS" | "AMAN"
+export type StatusStok = "habis" | "menipis" | "aman"
 
 export interface Bahan {
   id_bahan: number

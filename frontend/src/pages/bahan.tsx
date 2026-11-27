@@ -55,19 +55,19 @@ const EMPTY_FORM: BahanFormValues = {
 };
 
 const STOCK_STATUS_LABEL: Record<StatusStok, string> = {
-  HABIS: "Habis",
-  MENIPIS: "Menipis",
-  AMAN: "Aman",
+  habis: "Habis",
+  menipis: "Menipis",
+  aman: "Aman",
 };
 
 function getStockStatusClass(status: StatusStok): string {
   switch (status) {
-    case "HABIS":
-      return "border-red-300 bg-red-50 text-red-700";
-    case "MENIPIS":
-      return "border-amber-300 bg-amber-50 text-amber-700";
-    case "AMAN":
-      return "border-emerald-300 bg-emerald-50 text-emerald-700";
+    case "habis":
+      return "border-red-300 bg-red-50 text-red-700"
+    case "menipis":
+      return "border-amber-300 bg-amber-50 text-amber-700"
+    case "aman":
+      return "border-emerald-300 bg-emerald-50 text-emerald-700"
   }
 }
 
