@@ -55,19 +55,30 @@ const EMPTY_FORM: BahanFormValues = {
 };
 
 const STOCK_STATUS_LABEL: Record<StatusStok, string> = {
-  habis: "Habis",
-  menipis: "Menipis",
-  aman: "Aman",
+  habis: "HABIS",
+  menipis: "MENIPIS",
+  aman: "AMAN",
 };
 
 function getStockStatusClass(status: StatusStok): string {
   switch (status) {
     case "habis":
-      return "border-red-300 bg-red-50 text-red-700"
+      return "border-red-400 bg-red-100 text-red-800";
     case "menipis":
-      return "border-amber-300 bg-amber-50 text-amber-700"
+      return "border-amber-400 bg-amber-100 text-amber-900";
     case "aman":
-      return "border-emerald-300 bg-emerald-50 text-emerald-700"
+      return "border-emerald-400 bg-emerald-100 text-emerald-800";
+  }
+}
+
+function getCardBorderClass(status: StatusStok): string {
+  switch (status) {
+    case "habis":
+      return "border-2 border-red-300 bg-red-50/40";
+    case "menipis":
+      return "border-2 border-amber-300 bg-amber-50/40";
+    case "aman":
+      return "border";
   }
 }
 
@@ -104,7 +115,7 @@ export function BahanPage() {
         setPageError(
           error instanceof Error
             ? error.message
-            : "Gagal mengambil data master.",
+            : "Gagal mengambil data bahan.",
         );
       })
       .finally(() => {
@@ -170,7 +181,7 @@ export function BahanPage() {
       !Number.isFinite(stokMinimum) ||
       stokMinimum < 0
     ) {
-      setFormError("Periksa kembali seluruh input yang diwajibkan.");
+      setFormError("Periksa kembali seluruh isian yang wajib diisi.");
       return;
     }
 
@@ -239,16 +250,23 @@ export function BahanPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Data Bahan</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Kelola daftar bahan baku dan bahan kemasan.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Stok Bahan</h1>
+          <p className="mt-1 text-base text-muted-foreground">
+            Lihat sisa stok bahan baku dan kemasan saat ini.
+          </p>
+        </div>
+
+        <Button size="lg" onClick={openCreateDialog}>
+          <Plus className="size-5" />
+          Tambah Bahan Baru
+        </Button>
       </div>
 
       {pageError && (
         <div
-          className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+          className="rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-base font-medium text-destructive"
           role="alert"
         >
           {pageError}
@@ -257,33 +275,102 @@ export function BahanPage() {
 
       <Card>
         <CardContent className="space-y-4 pt-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
 
-              <Input
-                placeholder="Cari nama bahan..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            <Button onClick={openCreateDialog}>
-              <Plus className="size-4" />
-              Tambah Bahan
-            </Button>
+            <Input
+              placeholder="Cari nama bahan (misal: Ayam, Cabai)..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="pl-11"
+            />
           </div>
 
-          <div className="overflow-x-auto rounded-md border">
+          {/* Tampilan Kartu untuk HP (tanpa geser tabel ke samping) */}
+          <div className="grid gap-3 md:hidden">
+            {isLoading ? (
+              <p className="py-10 text-center text-base text-muted-foreground">
+                Memuat daftar bahan...
+              </p>
+            ) : filteredBahan.length > 0 ? (
+              filteredBahan.map((bahan) => (
+                <div
+                  key={bahan.id_bahan}
+                  className={`space-y-3 rounded-2xl p-4 ${getCardBorderClass(bahan.status)} ${!bahan.aktif ? "opacity-60" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold">{bahan.nama_bahan}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {bahan.nama_kategori}
+                        {!bahan.aktif && " • (Tidak dipakai)"}
+                      </p>
+                    </div>
+
+                    <Badge
+                      variant="outline"
+                      className={getStockStatusClass(bahan.status)}
+                    >
+                      {STOCK_STATUS_LABEL[bahan.status]}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-baseline justify-between rounded-xl bg-muted/60 px-3.5 py-2.5">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Sisa Stok Sekarang
+                      </p>
+                      <p className="text-2xl font-extrabold">
+                        {bahan.stok_saat_ini} {bahan.nama_satuan}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">
+                        Batas Minimum
+                      </p>
+                      <p className="text-base font-semibold">
+                        {bahan.stok_minimum} {bahan.nama_satuan}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(bahan)}
+                    >
+                      <Pencil className="size-4" />
+                      Ubah
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleToggleActive(bahan)}
+                    >
+                      {bahan.aktif ? "Nonaktifkan" : "Aktifkan"}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="py-10 text-center text-base text-muted-foreground">
+                Tidak ada bahan ditemukan.
+              </p>
+            )}
+          </div>
+
+          {/* Tampilan Tabel untuk Layar Lebar / Laptop */}
+          <div className="hidden overflow-x-auto rounded-xl border md:block">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nama Bahan</TableHead>
                   <TableHead>Kategori</TableHead>
-                  <TableHead>Satuan</TableHead>
-                  <TableHead>Stok</TableHead>
-                  <TableHead>Stok Minimum</TableHead>
+                  <TableHead>Sisa Stok</TableHead>
+                  <TableHead>Batas Minimum</TableHead>
                   <TableHead>Kondisi Stok</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
@@ -294,7 +381,7 @@ export function BahanPage() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={7}
                       className="h-24 text-center text-muted-foreground"
                     >
                       Memuat data bahan...
@@ -303,15 +390,13 @@ export function BahanPage() {
                 ) : filteredBahan.length > 0 ? (
                   filteredBahan.map((bahan) => (
                     <TableRow key={bahan.id_bahan}>
-                      <TableCell className="font-medium">
+                      <TableCell className="text-base font-bold">
                         {bahan.nama_bahan}
                       </TableCell>
 
                       <TableCell>{bahan.nama_kategori}</TableCell>
 
-                      <TableCell>{bahan.nama_satuan}</TableCell>
-
-                      <TableCell>
+                      <TableCell className="text-base font-bold">
                         {bahan.stok_saat_ini} {bahan.nama_satuan}
                       </TableCell>
 
@@ -335,14 +420,15 @@ export function BahanPage() {
                       </TableCell>
 
                       <TableCell>
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-2">
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Edit ${bahan.nama_bahan}`}
+                            variant="outline"
+                            size="sm"
+                            aria-label={`Ubah ${bahan.nama_bahan}`}
                             onClick={() => openEditDialog(bahan)}
                           >
                             <Pencil className="size-4" />
+                            Ubah
                           </Button>
 
                           <Button
@@ -359,7 +445,7 @@ export function BahanPage() {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={7}
                       className="h-24 text-center text-muted-foreground"
                     >
                       Tidak ada bahan ditemukan.
@@ -370,7 +456,7 @@ export function BahanPage() {
             </Table>
           </div>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Menampilkan {filteredBahan.length} dari {bahanList.length} bahan.
           </p>
         </CardContent>
@@ -379,18 +465,18 @@ export function BahanPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>
-              {editingId !== null ? "Edit Bahan" : "Tambah Bahan"}
+            <DialogTitle className="text-lg font-bold">
+              {editingId !== null ? "Ubah Bahan" : "Tambah Bahan Baru"}
             </DialogTitle>
 
-            <DialogDescription>
-              Isi informasi bahan yang akan disimpan.
+            <DialogDescription className="text-sm">
+              Isi nama bahan, satuan takaran, dan batas stok minimum untuk peringatan belanja.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="nama_bahan" className="text-sm font-medium">
+              <label htmlFor="nama_bahan" className="text-base font-medium">
                 Nama Bahan
               </label>
 
@@ -403,14 +489,14 @@ export function BahanPage() {
                     nama_bahan: event.target.value,
                   }))
                 }
-                placeholder="Contoh: Ayam"
+                placeholder="Contoh: Ayam Potong"
                 required
                 disabled={isSaving}
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="kategori" className="text-sm font-medium">
+              <label htmlFor="kategori" className="text-base font-medium">
                 Kategori
               </label>
 
@@ -439,8 +525,8 @@ export function BahanPage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="satuan" className="text-sm font-medium">
-                Satuan
+              <label htmlFor="satuan" className="text-base font-medium">
+                Satuan Takaran
               </label>
 
               <Select
@@ -454,7 +540,7 @@ export function BahanPage() {
                 items={satuanItems}
               >
                 <SelectTrigger id="satuan" className="w-full">
-                  <SelectValue placeholder="Pilih satuan" />
+                  <SelectValue placeholder="Pilih satuan (kg, liter, butir...)" />
                 </SelectTrigger>
 
                 <SelectContent>
@@ -468,8 +554,8 @@ export function BahanPage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="stok_minimum" className="text-sm font-medium">
-                Stok Minimum
+              <label htmlFor="stok_minimum" className="text-base font-medium">
+                Batas Minimum (Peringatan Menipis)
               </label>
 
               <Input
@@ -491,12 +577,12 @@ export function BahanPage() {
             </div>
 
             {formError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="text-base font-medium text-destructive" role="alert">
                 {formError}
               </p>
             )}
 
-            <DialogFooter>
+            <DialogFooter className="gap-2">
               <Button
                 type="button"
                 variant="outline"

@@ -1,6 +1,5 @@
-
 import { useEffect, useRef, useState, type SubmitEvent } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { CheckCircle2, Plus, Trash2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,7 +19,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-import { ApiError } from "@/services/api"
+import {
+  formatCurrency as formatRupiah,
+  formatDate,
+  formatQuantity,
+  getErrorMessage,
+  getTodayDateString,
+} from "@/lib/format"
 import { getActiveBahanList } from "@/services/bahan-service"
 import { getPemasokList } from "@/services/pemasok-service"
 import { createTransaksi } from "@/services/transaksi-service"
@@ -52,28 +57,6 @@ const INITIAL_DETAIL: DetailFormState = {
   harga_beli_satuan: "",
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.message
-  }
-
-  return "Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi."
-}
-
-function formatRupiah(value: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-function formatQuantity(value: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    maximumFractionDigits: 2,
-  }).format(value)
-}
-
 export function TransaksiForm({ mode }: TransaksiFormProps) {
   const isMasuk = mode === "masuk"
   const nextRowId = useRef(2)
@@ -84,7 +67,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
   const [isLoadingOptions, setIsLoadingOptions] = useState(true)
   const [optionError, setOptionError] = useState("")
 
-  const [tanggal, setTanggal] = useState("")
+  const [tanggal, setTanggal] = useState(() => getTodayDateString())
   const [idPemasok, setIdPemasok] = useState("")
   const [catatan, setCatatan] = useState("")
   const [items, setItems] = useState<DetailFormState[]>([
@@ -96,7 +79,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
   const [lastSubmission, setLastSubmission] =
     useState<TransaksiResponse | null>(null)
 
-  const title = isMasuk ? "Barang Masuk" : "Barang Keluar"
+  const title = isMasuk ? "Catat Barang Masuk" : "Catat Barang Keluar"
 
   // Ambil pilihan bahan dan pemasok dari backend.
   useEffect(() => {
@@ -163,6 +146,36 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
     setLastSubmission(null)
   }
 
+  function quickPickBahan(idBahan: number) {
+    const idStr = String(idBahan)
+
+    if (items.some((item) => item.id_bahan === idStr)) {
+      return
+    }
+
+    const emptyRow = items.find((item) => !item.id_bahan)
+
+    if (emptyRow) {
+      updateDetail(emptyRow.rowId, { id_bahan: idStr })
+      return
+    }
+
+    const rowId = nextRowId.current
+    nextRowId.current += 1
+
+    setItems((current) => [
+      ...current,
+      {
+        rowId,
+        id_bahan: idStr,
+        jumlah: "",
+        harga_beli_satuan: "",
+      },
+    ])
+    setError("")
+    setLastSubmission(null)
+  }
+
   function removeDetail(rowId: number) {
     setItems((current) => current.filter((item) => item.rowId !== rowId))
     setError("")
@@ -170,7 +183,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
   }
 
   function resetForm() {
-    setTanggal("")
+    setTanggal(getTodayDateString())
     setIdPemasok("")
     setCatatan("")
     setItems([{ ...INITIAL_DETAIL }])
@@ -184,12 +197,12 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
     setLastSubmission(null)
 
     if (!tanggal) {
-      setError("Tanggal transaksi wajib diisi.")
+      setError("Tanggal wajib diisi.")
       return
     }
 
     if (isMasuk && !idPemasok) {
-      setError("Pemasok wajib dipilih.")
+      setError("Pilih toko pemasok terlebih dahulu.")
       return
     }
 
@@ -201,7 +214,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
           (isMasuk && !item.harga_beli_satuan.trim()),
       )
     ) {
-      setError("Semua informasi detail bahan wajib diisi.")
+      setError("Pastikan nama bahan, jumlah, dan harga sudah diisi lengkap.")
       return
     }
 
@@ -226,7 +239,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
         const harga = Number(item.harga_beli_satuan)
 
         if (!Number.isInteger(harga) || harga < 1) {
-          setError("Harga beli harus berupa bilangan bulat Rupiah dan lebih besar dari nol.")
+          setError("Harga beli harus berupa angka Rupiah lebih dari nol.")
           return
         }
 
@@ -279,27 +292,112 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
 
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           {isMasuk
-            ? "Catat pembelian dan penerimaan bahan."
-            : "Catat penggunaan bahan untuk produksi."}
+            ? "Catat bahan yang baru dibeli dari toko langganan."
+            : "Kurangi stok bahan yang dipakai masak hari ini."}
         </p>
       </div>
 
       {optionError && (
         <div
-          className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-base font-medium text-destructive"
           role="alert"
         >
           {optionError}
         </div>
       )}
 
+      {lastSubmission && (
+        <Card className="border-2 border-emerald-400 bg-emerald-50/60">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-emerald-900">
+                <CheckCircle2 className="size-6 shrink-0 text-emerald-600" />
+                <CardTitle className="text-lg font-bold">
+                  Catatan Berhasil Disimpan!
+                </CardTitle>
+              </div>
+
+              <Badge
+                variant="outline"
+                className="border-emerald-400 bg-emerald-100 text-emerald-900"
+              >
+                {lastSubmission.jenis_transaksi === "masuk"
+                  ? "Barang Masuk"
+                  : "Barang Keluar"}
+              </Badge>
+            </div>
+
+            <CardDescription className="text-sm text-emerald-900/80">
+              Tanggal {formatDate(lastSubmission.waktu_transaksi)}
+              {lastSubmission.nama_pemasok
+                ? ` • Pemasok: ${lastSubmission.nama_pemasok}`
+                : ""}
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-3">
+            <div className="space-y-2 rounded-xl bg-white/80 p-3">
+              {lastSubmission.detail.map((detail) => {
+                const updatedBahan = bahanList.find(
+                  (bahan) => bahan.id_bahan === detail.id_bahan,
+                )
+
+                return (
+                  <div
+                    key={detail.id_bahan}
+                    className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 last:border-b-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="text-base font-bold">{detail.nama_bahan}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {lastSubmission.jenis_transaksi === "masuk"
+                          ? "Ditambah"
+                          : "Dikurangi"}{" "}
+                        <span className="font-semibold text-foreground">
+                          {formatQuantity(detail.jumlah)} {detail.satuan}
+                        </span>
+                        {updatedBahan && (
+                          <>
+                            {" "}
+                            • Sisa stok sekarang:{" "}
+                            <span className="font-bold text-foreground">
+                              {formatQuantity(updatedBahan.stok_saat_ini)}{" "}
+                              {updatedBahan.nama_satuan}
+                            </span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+
+                    {lastSubmission.jenis_transaksi === "masuk" && (
+                      <span className="text-base font-bold">
+                        {formatRupiah(detail.subtotal)}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {lastSubmission.jenis_transaksi === "masuk" && (
+              <div className="flex justify-between pt-1 text-base font-bold text-emerald-950">
+                <span>Total Belanja</span>
+                <span>
+                  {formatRupiah(lastSubmission.total_pembelian)}
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Informasi Transaksi</CardTitle>
-          <CardDescription>
-            Lengkapi informasi transaksi dan detail bahan.
+          <CardTitle className="text-lg font-bold">Isi Catatan</CardTitle>
+          <CardDescription className="text-sm">
+            Tanggal otomatis terisi hari ini. Pilih bahan lalu masukkan jumlahnya.
           </CardDescription>
         </CardHeader>
 
@@ -307,8 +405,8 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label htmlFor="tanggal" className="text-sm font-medium">
-                  Tanggal Transaksi
+                <label htmlFor="tanggal" className="text-base font-medium">
+                  Tanggal
                 </label>
 
                 <Input
@@ -327,8 +425,8 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
 
               {isMasuk && (
                 <div className="space-y-2">
-                  <label htmlFor="pemasok" className="text-sm font-medium">
-                    Pemasok
+                  <label htmlFor="pemasok" className="text-base font-medium">
+                    Beli di Toko / Pemasok
                   </label>
 
                   <Select
@@ -351,7 +449,7 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                             ? "Memuat pemasok..."
                             : pemasokList.length === 0
                               ? "Belum ada pemasok"
-                              : "Pilih pemasok"
+                              : "Pilih toko langganan"
                         }
                       />
                     </SelectTrigger>
@@ -371,34 +469,64 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
               )}
             </div>
 
+            {/* Tombol pilih cepat bahan */}
+            {!isLoadingOptions && bahanList.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Ketuk bahan untuk memilih cepat:
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  {bahanList.slice(0, 10).map((bahan) => {
+                    const isSelected = items.some(
+                      (item) => Number(item.id_bahan) === bahan.id_bahan,
+                    )
+
+                    return (
+                      <Button
+                        key={bahan.id_bahan}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        disabled={isSelected || isSubmitting}
+                        onClick={() => quickPickBahan(bahan.id_bahan)}
+                      >
+                        {bahan.nama_bahan} ({formatQuantity(bahan.stok_saat_ini)}{" "}
+                        {bahan.nama_satuan})
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold">Detail Bahan</h2>
+                  <h2 className="text-base font-bold">Daftar Bahan</h2>
                   <p className="text-sm text-muted-foreground">
-                    Tambahkan satu atau beberapa bahan.
+                    Bisa catat satu atau beberapa bahan sekaligus.
                   </p>
                 </div>
 
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={addDetail}
                   disabled={isSubmitting}
                 >
                   <Plus className="size-4" />
-                  Tambah Bahan
+                  Tambah Baris Bahan
                 </Button>
               </div>
 
               {isLoadingOptions ? (
-                <p className="rounded-md border p-4 text-sm text-muted-foreground">
+                <p className="rounded-xl border p-4 text-base text-muted-foreground">
                   Memuat daftar bahan...
                 </p>
               ) : bahanList.length === 0 ? (
-                <p className="rounded-md border p-4 text-sm text-muted-foreground">
-                  Belum ada bahan aktif. Tambahkan atau aktifkan bahan terlebih dahulu.
+                <p className="rounded-xl border p-4 text-base text-muted-foreground">
+                  Belum ada bahan aktif. Tambahkan bahan di menu Stok terlebih dahulu.
                 </p>
               ) : (
                 items.map((item, index) => {
@@ -414,33 +542,40 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                     (bahan) => !selectedIds.includes(String(bahan.id_bahan)),
                   )
 
+                  const numericHarga = Number(item.harga_beli_satuan)
+                  const numericJumlah = Number(item.jumlah)
+
                   return (
                     <div
                       key={item.rowId}
-                      className="space-y-4 rounded-lg border p-4"
+                      className="space-y-4 rounded-2xl border-2 p-4"
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold">
+                        <p className="text-base font-bold">
                           Bahan {index + 1}
                         </p>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Hapus bahan ${index + 1}`}
-                          disabled={items.length === 1 || isSubmitting}
-                          onClick={() => removeDetail(item.rowId)}
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
+                        {items.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Hapus bahan ${index + 1}`}
+                            disabled={isSubmitting}
+                            onClick={() => removeDetail(item.rowId)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                            Hapus
+                          </Button>
+                        )}
                       </div>
 
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                           <label
                             htmlFor={`bahan-${item.rowId}`}
-                            className="text-sm font-medium"
+                            className="text-base font-medium"
                           >
                             Nama Bahan
                           </label>
@@ -481,23 +616,27 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                         <div className="space-y-2">
                           <label
                             htmlFor={`jumlah-${item.rowId}`}
-                            className="text-sm font-medium"
+                            className="text-base font-medium"
                           >
-                            Jumlah
+                            Jumlah{" "}
+                            {selectedBahan
+                              ? `(${selectedBahan.nama_satuan})`
+                              : ""}
                           </label>
 
                           <Input
                             id={`jumlah-${item.rowId}`}
                             type="number"
+                            inputMode="decimal"
                             min="0.01"
-                            step="0.01"
+                            step="any"
                             value={item.jumlah}
                             onChange={(event) =>
                               updateDetail(item.rowId, {
                                 jumlah: event.target.value,
                               })
                             }
-                            placeholder="Masukkan jumlah"
+                            placeholder="Contoh: 2"
                             disabled={isSubmitting}
                           />
                         </div>
@@ -506,14 +645,19 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                           <div className="space-y-2 sm:col-span-2">
                             <label
                               htmlFor={`harga-${item.rowId}`}
-                              className="text-sm font-medium"
+                              className="text-base font-medium"
                             >
-                              Harga Beli per Satuan (Rp)
+                              Harga Beli per{" "}
+                              {selectedBahan
+                                ? selectedBahan.nama_satuan
+                                : "Satuan"}{" "}
+                              (Rp)
                             </label>
 
                             <Input
                               id={`harga-${item.rowId}`}
                               type="number"
+                              inputMode="numeric"
                               min="1"
                               step="1"
                               value={item.harga_beli_satuan}
@@ -522,18 +666,30 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                                   harga_beli_satuan: event.target.value,
                                 })
                               }
-                              placeholder="Contoh: 35000"
+                              placeholder="Contoh: 50000"
                               disabled={isSubmitting}
                             />
+
+                            {Number.isFinite(numericHarga) &&
+                              numericHarga > 0 && (
+                                <p className="text-sm font-semibold text-emerald-800">
+                                  Terbaca: {formatRupiah(numericHarga)}
+                                  {Number.isFinite(numericJumlah) &&
+                                    numericJumlah > 0 &&
+                                    ` • Subtotal: ${formatRupiah(Math.round(numericHarga * numericJumlah))}`}
+                                </p>
+                              )}
                           </div>
                         )}
                       </div>
 
                       {selectedBahan && (
-                        <p className="text-xs text-muted-foreground">
-                          Stok tersedia:{" "}
-                          {formatQuantity(selectedBahan.stok_saat_ini)}{" "}
-                          {selectedBahan.nama_satuan}
+                        <p className="rounded-xl bg-muted/60 px-3 py-2 text-sm">
+                          Sisa stok saat ini:{" "}
+                          <span className="font-bold">
+                            {formatQuantity(selectedBahan.stok_saat_ini)}{" "}
+                            {selectedBahan.nama_satuan}
+                          </span>
                         </p>
                       )}
                     </div>
@@ -543,8 +699,8 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="catatan" className="text-sm font-medium">
-                Catatan (Opsional)
+              <label htmlFor="catatan" className="text-base font-medium">
+                Keterangan Tambahan (Boleh Dikosongkan)
               </label>
 
               <textarea
@@ -554,111 +710,36 @@ export function TransaksiForm({ mode }: TransaksiFormProps) {
                   setCatatan(event.target.value)
                   setLastSubmission(null)
                 }}
-                rows={3}
+                rows={2}
                 maxLength={500}
-                placeholder="Tambahkan catatan transaksi..."
+                placeholder="Contoh: Beli cabai banyak karena harga murah..."
                 disabled={isSubmitting}
-                className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="w-full resize-y rounded-2xl border border-input bg-background px-3.5 py-2.5 text-base outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               />
             </div>
 
             {error && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-base font-medium text-destructive" role="alert">
                 {error}
               </p>
             )}
 
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                disabled={
-                  isLoadingOptions ||
-                  isSubmitting ||
-                  bahanList.length === 0 ||
-                  (isMasuk && pemasokList.length === 0)
-                }
-              >
-                {isSubmitting ? "Menyimpan..." : "Simpan Transaksi"}
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={
+                isLoadingOptions ||
+                isSubmitting ||
+                bahanList.length === 0 ||
+                (isMasuk && pemasokList.length === 0)
+              }
+            >
+              {isSubmitting ? "Menyimpan..." : `Simpan ${title}`}
+            </Button>
           </form>
         </CardContent>
       </Card>
-
-      {lastSubmission && (
-        <Card>
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-base">
-                Transaksi Berhasil Disimpan
-              </CardTitle>
-
-              <Badge variant="outline">
-                {lastSubmission.jenis_transaksi === "masuk"
-                  ? "Barang Masuk"
-                  : "Barang Keluar"}
-              </Badge>
-            </div>
-
-            <CardDescription>
-              Data berikut berasal dari respons backend.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-3">
-            <p className="break-all text-sm">
-              ID Transaksi: {lastSubmission.id_transaksi}
-            </p>
-
-            <p className="text-sm">
-              Tanggal: {lastSubmission.waktu_transaksi}
-            </p>
-
-            {lastSubmission.nama_pemasok && (
-              <p className="text-sm">
-                Pemasok: {lastSubmission.nama_pemasok}
-              </p>
-            )}
-
-            {lastSubmission.catatan && (
-              <p className="text-sm">
-                Catatan: {lastSubmission.catatan}
-              </p>
-            )}
-
-            <div className="space-y-2 border-t pt-3">
-              {lastSubmission.detail.map((detail) => (
-                <div
-                  key={detail.id_bahan}
-                  className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 text-sm"
-                >
-                  <div>
-                    <p className="font-medium">{detail.nama_bahan}</p>
-                    <p className="text-muted-foreground">
-                      {formatQuantity(detail.jumlah)} {detail.satuan}
-                    </p>
-                  </div>
-
-                  {lastSubmission.jenis_transaksi === "masuk" && (
-                    <span>
-                      {formatRupiah(detail.subtotal)}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {lastSubmission.jenis_transaksi === "masuk" && (
-              <div className="flex justify-between pt-2 font-semibold">
-                <span>Total Pembelian</span>
-                <span>
-                  {formatRupiah(lastSubmission.total_pembelian)}
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

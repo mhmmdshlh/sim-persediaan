@@ -38,6 +38,12 @@ const updateBahanSchema = z
       .min(0, 'Stok minimum tidak boleh negatif.')
       .max(MAX_NUMERIC_QTY, 'Stok minimum melebihi batas maksimal.')
       .optional(),
+    stok_saat_ini: z
+      .number()
+      .finite()
+      .min(0, 'Stok saat ini tidak boleh negatif.')
+      .max(MAX_NUMERIC_QTY, 'Stok saat ini melebihi batas maksimal.')
+      .optional(),
     aktif: z.boolean().optional(),
   })
   .refine((val) => Object.keys(val).length > 0, {
@@ -213,6 +219,9 @@ export function createBahanRouter(db: AppDb): Router {
     if (body.id_satuan !== undefined) updatePayload.id_satuan = body.id_satuan;
     if (body.stok_minimum !== undefined) {
       updatePayload.stok_minimum = roundQty(body.stok_minimum).toFixed(2);
+    }
+    if (body.stok_saat_ini !== undefined) {
+      updatePayload.stok_saat_ini = roundQty(body.stok_saat_ini).toFixed(2);
     }
     if (body.aktif !== undefined) updatePayload.aktif = body.aktif;
 

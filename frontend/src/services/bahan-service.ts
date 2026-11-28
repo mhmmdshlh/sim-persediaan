@@ -16,7 +16,7 @@ export async function createBahan(
 
 export async function updateBahan(
   id: number,
-  payload: Partial<BahanPayload> & { aktif?: boolean },
+  payload: Partial<BahanPayload> & { aktif?: boolean; stok_saat_ini?: number },
 ): Promise<Bahan> {
   return apiRequest<Bahan>(`/api/bahan/${id}`, {
     method: "PATCH",

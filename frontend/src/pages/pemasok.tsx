@@ -1,4 +1,3 @@
-
 import { useEffect, useState, type SubmitEvent } from "react"
 import { Pencil, Plus, Search, Trash2 } from "lucide-react"
 
@@ -25,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import { ApiError } from "@/services/api"
+import { getErrorMessage } from "@/lib/format"
 import {
   createPemasok,
   deletePemasok,
@@ -39,14 +38,6 @@ const EMPTY_FORM: PemasokFormValues = {
   nama_pemasok: "",
   no_telepon: "",
   alamat: "",
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.message
-  }
-
-  return "Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi."
 }
 
 function matchesSearch(pemasok: Pemasok, search: string): boolean {
@@ -77,28 +68,30 @@ export function PemasokPage() {
 
   const isLoading = loadedSearch !== search
 
-  // Mengambil data dari backend setiap kali kata pencarian berubah.
   useEffect(() => {
     let isActive = true
 
-    getPemasokList(search)
-      .then((data) => {
-        if (!isActive) return
+    const timer = window.setTimeout(() => {
+      getPemasokList(search)
+        .then((data) => {
+          if (!isActive) return
 
-        setPemasokList(data)
-        setPageError("")
-        setLoadedSearch(search)
-      })
-      .catch((error: unknown) => {
-        if (!isActive) return
+          setPemasokList(data)
+          setPageError("")
+          setLoadedSearch(search)
+        })
+        .catch((error: unknown) => {
+          if (!isActive) return
 
-        setPemasokList([])
-        setPageError(getErrorMessage(error))
-        setLoadedSearch(search)
-      })
+          setPemasokList([])
+          setPageError(getErrorMessage(error))
+          setLoadedSearch(search)
+        })
+    }, 200)
 
     return () => {
       isActive = false
+      window.clearTimeout(timer)
     }
   }, [search])
 
@@ -207,19 +200,26 @@ export function PemasokPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Data Pemasok
-        </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Daftar Pemasok
+          </h1>
 
-        <p className="mt-1 text-sm text-muted-foreground">
-          Kelola informasi pemasok bahan baku dan bahan kemasan.
-        </p>
+          <p className="mt-1 text-base text-muted-foreground">
+            Toko langganan tempat membeli bahan baku dan kemasan.
+          </p>
+        </div>
+
+        <Button size="lg" onClick={openCreateDialog}>
+          <Plus className="size-5" />
+          Tambah Pemasok
+        </Button>
       </div>
 
       {pageError && (
         <div
-          className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-base font-medium text-destructive"
           role="alert"
         >
           {pageError}
@@ -228,33 +228,83 @@ export function PemasokPage() {
 
       <Card>
         <CardContent className="space-y-4 pt-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
 
-              <Input
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value)
-                  setPageError("")
-                }}
-                placeholder="Cari pemasok..."
-                className="pl-9"
-              />
-            </div>
-
-            <Button onClick={openCreateDialog}>
-              <Plus className="size-4" />
-              Tambah Pemasok
-            </Button>
+            <Input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPageError("")
+              }}
+              placeholder="Cari nama toko atau nomor telepon..."
+              className="pl-11"
+            />
           </div>
 
-          <div className="overflow-x-auto rounded-md border">
+          {/* Tampilan Kartu untuk HP */}
+          <div className="grid gap-3 md:hidden">
+            {isLoading ? (
+              <p className="py-10 text-center text-base text-muted-foreground">
+                Memuat data pemasok...
+              </p>
+            ) : pemasokList.length > 0 ? (
+              pemasokList.map((pemasok) => (
+                <div
+                  key={pemasok.id_pemasok}
+                  className="space-y-3 rounded-2xl border p-4"
+                >
+                  <div>
+                    <p className="text-lg font-bold">
+                      {pemasok.nama_pemasok}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Telp: {pemasok.no_telepon || "-"}
+                    </p>
+                    {pemasok.alamat && (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {pemasok.alamat}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-2.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(pemasok)}
+                      disabled={deletingId !== null}
+                    >
+                      <Pencil className="size-4" />
+                      Ubah
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(pemasok)}
+                      disabled={deletingId !== null}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                      Hapus
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="py-10 text-center text-base text-muted-foreground">
+                Belum ada data pemasok.
+              </p>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-xl border md:block">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nama Pemasok</TableHead>
-                  <TableHead>Nomor Telepon</TableHead>
+                  <TableHead>Nomor Telepon / WA</TableHead>
                   <TableHead>Alamat</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
@@ -273,7 +323,7 @@ export function PemasokPage() {
                 ) : pemasokList.length > 0 ? (
                   pemasokList.map((pemasok) => (
                     <TableRow key={pemasok.id_pemasok}>
-                      <TableCell className="font-medium">
+                      <TableCell className="text-base font-bold">
                         {pemasok.nama_pemasok}
                       </TableCell>
 
@@ -286,25 +336,28 @@ export function PemasokPage() {
                       </TableCell>
 
                       <TableCell>
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-2">
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Edit ${pemasok.nama_pemasok}`}
+                            variant="outline"
+                            size="sm"
+                            aria-label={`Ubah ${pemasok.nama_pemasok}`}
                             onClick={() => openEditDialog(pemasok)}
                             disabled={deletingId !== null}
                           >
                             <Pencil className="size-4" />
+                            Ubah
                           </Button>
 
                           <Button
                             variant="ghost"
-                            size="icon"
+                            size="sm"
                             aria-label={`Hapus ${pemasok.nama_pemasok}`}
                             onClick={() => handleDelete(pemasok)}
                             disabled={deletingId !== null}
+                            className="text-destructive hover:text-destructive"
                           >
                             <Trash2 className="size-4" />
+                            Hapus
                           </Button>
                         </div>
                       </TableCell>
@@ -328,7 +381,7 @@ export function PemasokPage() {
             </Table>
           </div>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Menampilkan {pemasokList.length} pemasok.
           </p>
         </CardContent>
@@ -342,12 +395,12 @@ export function PemasokPage() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingId !== null ? "Edit Pemasok" : "Tambah Pemasok"}
+            <DialogTitle className="text-lg font-bold">
+              {editingId !== null ? "Ubah Pemasok" : "Tambah Pemasok"}
             </DialogTitle>
 
-            <DialogDescription>
-              Masukkan informasi pemasok.
+            <DialogDescription className="text-sm">
+              Masukkan nama toko langganan dan nomor teleponnya.
             </DialogDescription>
           </DialogHeader>
 
@@ -355,9 +408,9 @@ export function PemasokPage() {
             <div className="space-y-2">
               <label
                 htmlFor="nama_pemasok"
-                className="text-sm font-medium"
+                className="text-base font-medium"
               >
-                Nama Pemasok
+                Nama Toko / Pemasok
               </label>
 
               <Input
@@ -370,7 +423,7 @@ export function PemasokPage() {
                   }))
                   setFormError("")
                 }}
-                placeholder="Masukkan nama pemasok"
+                placeholder="Contoh: Toko Sembako Jaya"
                 maxLength={120}
                 required
               />
@@ -379,9 +432,9 @@ export function PemasokPage() {
             <div className="space-y-2">
               <label
                 htmlFor="no_telepon"
-                className="text-sm font-medium"
+                className="text-base font-medium"
               >
-                Nomor Telepon
+                Nomor Telepon / WhatsApp
               </label>
 
               <Input
@@ -394,7 +447,7 @@ export function PemasokPage() {
                     no_telepon: event.target.value,
                   }))
                 }
-                placeholder="Masukkan nomor telepon"
+                placeholder="Contoh: 0812..."
                 maxLength={30}
               />
             </div>
@@ -402,7 +455,7 @@ export function PemasokPage() {
             <div className="space-y-2">
               <label
                 htmlFor="alamat"
-                className="text-sm font-medium"
+                className="text-base font-medium"
               >
                 Alamat
               </label>
@@ -416,20 +469,20 @@ export function PemasokPage() {
                     alamat: event.target.value,
                   }))
                 }
-                placeholder="Masukkan alamat pemasok"
+                placeholder="Masukkan alamat toko"
                 rows={3}
                 maxLength={500}
-                className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="w-full resize-y rounded-2xl border border-input bg-background px-3.5 py-2.5 text-base shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               />
             </div>
 
             {formError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="text-base font-medium text-destructive" role="alert">
                 {formError}
               </p>
             )}
 
-            <DialogFooter>
+            <DialogFooter className="gap-2">
               <Button
                 type="button"
                 variant="outline"

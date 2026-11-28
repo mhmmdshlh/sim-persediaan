@@ -5,7 +5,7 @@ export interface TokenPayload {
   username: string;
 }
 
-export const TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24;
+export const TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 function getSecretKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);

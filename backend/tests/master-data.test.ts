@@ -177,10 +177,11 @@ describe('Master data endpoints: kategori, satuan, pemasok, and bahan', () => {
     const toggleOff = await request(ctx.app)
       .patch('/api/bahan/1')
       .set('Authorization', `Bearer ${token}`)
-      .send({ aktif: false, stok_minimum: 3 });
+      .send({ aktif: false, stok_minimum: 3, stok_saat_ini: 12.5 });
     expect(toggleOff.status).toBe(200);
     expect(toggleOff.body.data.aktif).toBe(false);
     expect(toggleOff.body.data.stok_minimum).toBe(3);
+    expect(toggleOff.body.data.stok_saat_ini).toBe(12.5);
 
     const onlyActive = await request(ctx.app)
       .get('/api/bahan?aktif=true')

@@ -11,8 +11,16 @@ export class ApiError extends Error {
   }
 }
 
+export interface PaginationMeta {
+  page: number
+  page_size: number
+  total_items: number
+  total_pages: number
+}
+
 interface ApiSuccess<T> {
   data: T
+  pagination?: PaginationMeta
 }
 
 interface ApiErrorResponse {
@@ -22,10 +30,10 @@ interface ApiErrorResponse {
   }
 }
 
-export async function apiRequest<T>(
+export async function apiRequestWithMeta<T>(
   path: string,
   options: RequestInit = {},
-): Promise<T> {
+): Promise<ApiSuccess<T>> {
   const headers = new Headers(options.headers)
 
   headers.set("Accept", "application/json")
@@ -46,6 +54,15 @@ export async function apiRequest<T>(
       : await response.json().catch(() => null)
 
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      path !== "/api/auth/me" &&
+      path !== "/api/auth/login" &&
+      typeof window !== "undefined"
+    ) {
+      window.dispatchEvent(new Event("sim-persediaan:unauthorized"))
+    }
+
     const errorResponse =
       payload !== null &&
       typeof payload === "object" &&
@@ -61,7 +78,7 @@ export async function apiRequest<T>(
   }
 
   if (response.status === 204) {
-    return undefined as T
+    return { data: undefined as T }
   }
 
   if (
@@ -76,5 +93,13 @@ export async function apiRequest<T>(
     )
   }
 
-  return (payload as ApiSuccess<T>).data
+  return payload as ApiSuccess<T>
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const res = await apiRequestWithMeta<T>(path, options)
+  return res.data
 }

@@ -229,25 +229,28 @@ export function SimpleMasterPage({
                   filteredItems.map((item, index) => (
                     <TableRow key={item.id}>
                       <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell className="text-base font-bold">{item.name}</TableCell>
                       <TableCell>
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-2">
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Edit ${item.name}`}
+                            variant="outline"
+                            size="sm"
+                            aria-label={`Ubah ${item.name}`}
                             onClick={() => openEditDialog(item)}
                           >
                             <Pencil className="size-4" />
+                            Ubah
                           </Button>
 
                           <Button
                             variant="ghost"
-                            size="icon"
+                            size="sm"
                             aria-label={`Hapus ${item.name}`}
                             onClick={() => void handleDelete(item)}
+                            className="text-destructive hover:text-destructive"
                           >
                             <Trash2 className="size-4" />
+                            Hapus
                           </Button>
                         </div>
                       </TableCell>

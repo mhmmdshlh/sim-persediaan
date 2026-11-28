@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from "react"
-import { Eye, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, RefreshCw, Search, Trash2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -22,45 +22,29 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import { ApiError } from "@/services/api"
-import { getTransaksiList } from "@/services/transaksi-service"
+import {
+  formatCurrency,
+  formatDate,
+  formatQuantity,
+  getErrorMessage,
+} from "@/lib/format"
+import type { PaginationMeta } from "@/services/api"
+import {
+  deleteTransaksi,
+  getTransaksiList,
+} from "@/services/transaksi-service"
 
 import type { TransaksiResponse } from "@/types/transaksi"
 
-function formatDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number)
-
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(year, month - 1, day))
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
-
-function formatQuantity(amount: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    maximumFractionDigits: 2,
-  }).format(amount)
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.message
-  }
-
-  return "Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi."
-}
-
 export function RiwayatPage() {
   const [transactions, setTransactions] = useState<TransaksiResponse[]>([])
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    page: 1,
+    page_size: 25,
+    total_items: 0,
+    total_pages: 1,
+  })
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [selectedTransaction, setSelectedTransaction] =
     useState<TransaksiResponse | null>(null)
@@ -68,99 +52,205 @@ export function RiwayatPage() {
   const [loadedRequest, setLoadedRequest] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [pageError, setPageError] = useState("")
+  const [deleteError, setDeleteError] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const requestKey = `${search}\u0000${refreshKey}`
+  const requestKey = `${page}\u0000${search}\u0000${refreshKey}`
   const isLoading = loadedRequest !== requestKey
 
   useEffect(() => {
     let isActive = true
 
-    getTransaksiList({
-      page: 1,
-      page_size: 100,
-      search,
-    })
-      .then((data) => {
-        if (!isActive) return
-
-        setTransactions(data)
-        setPageError("")
-        setLoadedRequest(requestKey)
+    const timer = window.setTimeout(() => {
+      getTransaksiList({
+        page,
+        page_size: 25,
+        search,
       })
-      .catch((error: unknown) => {
-        if (!isActive) return
+        .then((result) => {
+          if (!isActive) return
 
-        setTransactions([])
-        setPageError(getErrorMessage(error))
-        setLoadedRequest(requestKey)
-      })
+          setTransactions(result.items)
+          setPagination(result.pagination)
+          setPageError("")
+          setLoadedRequest(requestKey)
+        })
+        .catch((error: unknown) => {
+          if (!isActive) return
+
+          setTransactions([])
+          setPageError(getErrorMessage(error))
+          setLoadedRequest(requestKey)
+        })
+    }, 200)
 
     return () => {
       isActive = false
+      window.clearTimeout(timer)
     }
-  }, [search, refreshKey, requestKey])
-
-  const totalTransaksi = transactions.length
+  }, [page, search, refreshKey, requestKey])
 
   function handleRefresh() {
     setRefreshKey((current) => current + 1)
   }
 
+  async function handleDeleteTransaction(tx: TransaksiResponse) {
+    const label =
+      tx.jenis_transaksi === "masuk"
+        ? tx.nama_pemasok || "Barang Masuk"
+        : tx.catatan || "Pakai Masak"
+
+    if (
+      !window.confirm(
+        `Batalkan catatan "${label}" (${formatDate(tx.waktu_transaksi)})? Stok bahan akan dikembalikan seperti semula.`,
+      )
+    ) {
+      return
+    }
+
+    setIsDeleting(true)
+    setDeleteError("")
+
+    try {
+      await deleteTransaksi(tx.id_transaksi)
+      setSelectedTransaction(null)
+      handleRefresh()
+    } catch (error: unknown) {
+      setDeleteError(getErrorMessage(error))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Riwayat Transaksi
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl font-extrabold tracking-tight">
+          Riwayat Catatan
         </h1>
 
-        <p className="mt-1 text-sm text-muted-foreground">
-          Lihat catatan barang masuk dan keluar.
-        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isLoading}
+        >
+          <RefreshCw className="size-4" aria-hidden="true" />
+          <span>Segarkan</span>
+        </Button>
       </div>
 
       {pageError && (
         <div
-          className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-base font-medium text-destructive"
           role="alert"
         >
           {pageError}
         </div>
       )}
 
-      <Card>
-        <CardContent className="space-y-4 pt-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="relative w-full sm:max-w-sm">
+        <Search
+          className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
 
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Cari ID, pemasok, atau catatan..."
-                className="pl-9"
-              />
-            </div>
+        <Input
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            setPage(1)
+          }}
+          placeholder="Cari catatan atau toko..."
+          className="pl-11"
+        />
+      </div>
 
-            <Button
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={isLoading}
-            >
-              Muat Ulang
-            </Button>
-          </div>
+      {/* Tampilan Kartu untuk HP (Ketuk kartu langsung buka rincian) */}
+      <div className="grid gap-3 md:hidden">
+        {isLoading ? (
+          <Card>
+            <CardContent className="py-10 text-center text-base text-muted-foreground">
+              Memuat...
+            </CardContent>
+          </Card>
+        ) : transactions.length > 0 ? (
+          transactions.map((transaction) => {
+            const isMasuk = transaction.jenis_transaksi === "masuk"
 
-          <div className="overflow-x-auto rounded-md border">
+            return (
+              <button
+                key={transaction.id_transaksi}
+                type="button"
+                onClick={() => {
+                  setDeleteError("")
+                  setSelectedTransaction(transaction)
+                }}
+                className="w-full cursor-pointer space-y-2 rounded-3xl border bg-card p-4 text-left shadow-xs transition-colors hover:bg-muted/50"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Badge
+                    variant="outline"
+                    className={
+                      isMasuk
+                        ? "border-emerald-400 bg-emerald-50 text-emerald-900"
+                        : "border-amber-400 bg-amber-50 text-amber-950"
+                    }
+                  >
+                    {isMasuk ? "+ Beli" : "- Pakai"}
+                  </Badge>
+
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {formatDate(transaction.waktu_transaksi)}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-base font-extrabold">
+                    {isMasuk
+                      ? transaction.nama_pemasok || "Barang Masuk"
+                      : transaction.catatan || "Pakai Masak"}
+                  </p>
+
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {transaction.detail
+                      .map(
+                        (d) =>
+                          `${d.nama_bahan} (${formatQuantity(d.jumlah)} ${d.satuan})`,
+                      )
+                      .join(", ")}
+                  </p>
+                </div>
+
+                {isMasuk && (
+                  <p className="pt-1 text-base font-black text-emerald-800 tabular-nums">
+                    {formatCurrency(transaction.total_pembelian)}
+                  </p>
+                )}
+              </button>
+            )
+          })
+        ) : (
+          <Card>
+            <CardContent className="py-10 text-center text-base text-muted-foreground">
+              Belum ada catatan.
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Tampilan Tabel untuk Laptop */}
+      <Card className="hidden md:block">
+        <CardContent className="pt-6">
+          <div className="overflow-x-auto rounded-xl border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID Transaksi</TableHead>
                   <TableHead>Tanggal</TableHead>
                   <TableHead>Jenis</TableHead>
-                  <TableHead>Pemasok</TableHead>
-                  <TableHead>Jumlah Bahan</TableHead>
-                  <TableHead>Total Pembelian</TableHead>
-                  <TableHead className="text-right">Detail</TableHead>
+                  <TableHead>Toko / Keterangan</TableHead>
+                  <TableHead>Bahan</TableHead>
+                  <TableHead>Total Belanja</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -168,208 +258,211 @@ export function RiwayatPage() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={5}
                       className="h-24 text-center text-muted-foreground"
                     >
-                      Memuat riwayat transaksi...
+                      Memuat...
                     </TableCell>
                   </TableRow>
                 ) : transactions.length > 0 ? (
                   transactions.map((transaction) => (
-                    <TableRow key={transaction.id_transaksi}>
-                      <TableCell className="font-mono text-xs">
-                        {transaction.id_transaksi.slice(0, 8)}
-                      </TableCell>
-
-                      <TableCell className="whitespace-nowrap">
+                    <TableRow
+                      key={transaction.id_transaksi}
+                      onClick={() => {
+                        setDeleteError("")
+                        setSelectedTransaction(transaction)
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <TableCell className="whitespace-nowrap font-medium">
                         {formatDate(transaction.waktu_transaksi)}
                       </TableCell>
 
                       <TableCell>
                         <Badge
-                          variant={
+                          variant="outline"
+                          className={
                             transaction.jenis_transaksi === "masuk"
-                              ? "default"
-                              : "secondary"
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                              : "border-amber-300 bg-amber-50 text-amber-900"
                           }
                         >
                           {transaction.jenis_transaksi === "masuk"
-                            ? "Masuk"
-                            : "Keluar"}
+                            ? "+ Beli"
+                            : "- Pakai"}
                         </Badge>
                       </TableCell>
 
-                      <TableCell>
-                        {transaction.nama_pemasok ?? "-"}
+                      <TableCell className="font-bold">
+                        {transaction.nama_pemasok ||
+                          transaction.catatan ||
+                          "-"}
                       </TableCell>
 
                       <TableCell>
-                        {transaction.detail.length} jenis bahan
+                        {transaction.detail
+                          .map(
+                            (d) =>
+                              `${d.nama_bahan} (${formatQuantity(d.jumlah)} ${d.satuan})`,
+                          )
+                          .join(", ")}
                       </TableCell>
 
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap font-bold tabular-nums">
                         {transaction.jenis_transaksi === "masuk"
                           ? formatCurrency(transaction.total_pembelian)
                           : "-"}
-                      </TableCell>
-
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedTransaction(transaction)}
-                        >
-                          <Eye className="size-4" />
-                          Detail
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={5}
                       className="h-24 text-center text-muted-foreground"
                     >
-                      {pageError
-                        ? "Riwayat transaksi tidak dapat dimuat."
-                        : search.trim()
-                          ? "Tidak ada transaksi yang cocok dengan pencarian."
-                          : "Belum ada transaksi."}
+                      Belum ada catatan.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            Menampilkan {totalTransaksi} transaksi.
-            {totalTransaksi === 100 &&
-              " Hanya 100 transaksi pertama yang ditampilkan."}
-          </p>
         </CardContent>
       </Card>
+
+      {/* Navigasi Halaman (Pagination) jika riwayat sudah lebih dari 25 catatan */}
+      {pagination.total_pages > 1 && (
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={page <= 1 || isLoading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            <ChevronLeft className="size-4" aria-hidden="true" />
+            <span>Sebelumnya</span>
+          </Button>
+
+          <span className="text-xs font-bold text-stone-600">
+            Hal. {pagination.page} / {pagination.total_pages} (
+            {pagination.total_items} catatan)
+          </span>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={page >= pagination.total_pages || isLoading}
+            onClick={() =>
+              setPage((p) => Math.min(pagination.total_pages, p + 1))
+            }
+          >
+            <span>Berikutnya</span>
+            <ChevronRight className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+      )}
 
       <Dialog
         open={selectedTransaction !== null}
         onOpenChange={(open) => {
-          if (!open) setSelectedTransaction(null)
+          if (!open && !isDeleting) setSelectedTransaction(null)
         }}
       >
-        <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Detail Transaksi</DialogTitle>
-
-            <DialogDescription>
-              Informasi lengkap transaksi persediaan.
+            <DialogTitle className="text-lg font-extrabold">
+              Rincian Catatan
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              {selectedTransaction
+                ? formatDate(selectedTransaction.waktu_transaksi)
+                : ""}
             </DialogDescription>
           </DialogHeader>
 
           {selectedTransaction && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="col-span-2">
-                  <p className="text-muted-foreground">ID Transaksi</p>
-                  <p className="break-all font-mono text-xs font-medium">
-                    {selectedTransaction.id_transaksi}
-                  </p>
+              {selectedTransaction.nama_pemasok && (
+                <div className="rounded-xl bg-muted/60 p-3 text-sm">
+                  Toko:{" "}
+                  <span className="font-bold">
+                    {selectedTransaction.nama_pemasok}
+                  </span>
                 </div>
-
-                <div>
-                  <p className="text-muted-foreground">Tanggal</p>
-                  <p className="font-medium">
-                    {formatDate(selectedTransaction.waktu_transaksi)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-muted-foreground">Jenis Transaksi</p>
-                  <p className="font-medium">
-                    {selectedTransaction.jenis_transaksi === "masuk"
-                      ? "Barang Masuk"
-                      : "Barang Keluar"}
-                  </p>
-                </div>
-
-                {selectedTransaction.nama_pemasok && (
-                  <div className="col-span-2">
-                    <p className="text-muted-foreground">Pemasok</p>
-                    <p className="font-medium">
-                      {selectedTransaction.nama_pemasok}
-                    </p>
-                  </div>
-                )}
-              </div>
+              )}
 
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold">Detail Bahan</h3>
-
-                <div className="overflow-x-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Bahan</TableHead>
-                        <TableHead>Jumlah</TableHead>
-
-                        {selectedTransaction.jenis_transaksi === "masuk" && (
-                          <>
-                            <TableHead>Harga Satuan</TableHead>
-                            <TableHead>Subtotal</TableHead>
-                          </>
-                        )}
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {selectedTransaction.detail.map((detail) => (
-                        <TableRow key={detail.id_bahan}>
-                          <TableCell>
-                            <p className="font-medium">{detail.nama_bahan}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {detail.satuan}
-                            </p>
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap">
-                            {formatQuantity(detail.jumlah)} {detail.satuan}
-                          </TableCell>
-
-                          {selectedTransaction.jenis_transaksi === "masuk" && (
-                            <>
-                              <TableCell className="whitespace-nowrap">
-                                {detail.harga_beli_satuan !== null
-                                  ? formatCurrency(detail.harga_beli_satuan)
-                                  : "-"}
-                              </TableCell>
-
-                              <TableCell className="whitespace-nowrap">
-                                {formatCurrency(detail.subtotal)}
-                              </TableCell>
-                            </>
+                {selectedTransaction.detail.map((detail) => (
+                  <div
+                    key={detail.id_bahan}
+                    className="flex items-center justify-between gap-3 rounded-xl border p-3"
+                  >
+                    <div>
+                      <p className="text-base font-bold">{detail.nama_bahan}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatQuantity(detail.jumlah)} {detail.satuan}
+                        {selectedTransaction.jenis_transaksi === "masuk" &&
+                          detail.harga_beli_satuan !== null && (
+                            <> × {formatCurrency(detail.harga_beli_satuan)}</>
                           )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </p>
+                    </div>
+
+                    {selectedTransaction.jenis_transaksi === "masuk" && (
+                      <p className="text-base font-bold tabular-nums">
+                        {formatCurrency(detail.subtotal)}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
 
               {selectedTransaction.jenis_transaksi === "masuk" && (
-                <div className="flex justify-between border-t pt-3 text-sm font-semibold">
-                  <span>Total Pembelian</span>
-                  <span>
+                <div className="flex justify-between border-t pt-3 text-base font-extrabold">
+                  <span>Total</span>
+                  <span className="tabular-nums">
                     {formatCurrency(selectedTransaction.total_pembelian)}
                   </span>
                 </div>
               )}
 
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Catatan</p>
+              {selectedTransaction.catatan && (
                 <p className="text-sm text-muted-foreground">
-                  {selectedTransaction.catatan || "Tidak ada catatan."}
+                  Keterangan: {selectedTransaction.catatan}
                 </p>
-              </div>
+              )}
+
+              {deleteError && (
+                <p
+                  className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-700"
+                  role="alert"
+                >
+                  {deleteError}
+                </p>
+              )}
+
+              <DialogFooter className="border-t pt-3">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={isDeleting}
+                  onClick={() =>
+                    void handleDeleteTransaction(selectedTransaction)
+                  }
+                  className="w-full font-bold sm:w-auto"
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  <span>
+                    {isDeleting
+                      ? "Membatalkan..."
+                      : "Batalkan / Hapus Catatan Ini"}
+                  </span>
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>

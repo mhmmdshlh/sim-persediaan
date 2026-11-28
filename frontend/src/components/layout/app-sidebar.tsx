@@ -22,23 +22,15 @@ const navGroups = [
     label: "MENU UTAMA",
     items: [
       {
-        title: "Dashboard",
+        title: "Beranda",
         href: "/",
         icon: LayoutDashboard,
       },
+      { title: "Stok Bahan", href: "/bahan", icon: Package },
     ],
   },
   {
-    label: "MASTER DATA",
-    items: [
-      { title: "Data Bahan", href: "/bahan", icon: Package },
-      { title: "Kategori", href: "/kategori", icon: Tags },
-      { title: "Satuan", href: "/satuan", icon: Ruler },
-      { title: "Pemasok", href: "/pemasok", icon: Truck },
-    ],
-  },
-  {
-    label: "TRANSAKSI",
+    label: "CATAT STOK",
     items: [
       {
         title: "Barang Masuk",
@@ -50,13 +42,16 @@ const navGroups = [
         href: "/transaksi/keluar",
         icon: ArrowUpFromLine,
       },
-      { title: "Riwayat Transaksi", href: "/riwayat", icon: History },
+      { title: "Riwayat Catatan", href: "/riwayat", icon: History },
     ],
   },
   {
-    label: "LAINNYA",
+    label: "PENGATURAN & LAPORAN",
     items: [
       { title: "Laporan", href: "/laporan", icon: BarChart3 },
+      { title: "Pemasok", href: "/pemasok", icon: Truck },
+      { title: "Kategori", href: "/kategori", icon: Tags },
+      { title: "Satuan", href: "/satuan", icon: Ruler },
     ],
   },
 ]
@@ -97,14 +92,14 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                     end={item.href === "/"}
                     onClick={onNavigate}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors ${
+                      `flex items-center gap-3 rounded-xl px-3.5 py-3 text-base transition-colors ${
                         isActive
-                          ? "bg-primary text-primary-foreground font-medium"
+                          ? "bg-primary text-primary-foreground font-semibold"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`
                     }
                   >
-                    <Icon className="size-4 shrink-0" />
+                    <Icon className="size-5 shrink-0" />
                     {item.title}
                   </NavLink>
                 )

@@ -37,6 +37,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [])
 
+  useEffect(() => {
+    function handleUnauthorized() {
+      setUser(null)
+    }
+
+    window.addEventListener("sim-persediaan:unauthorized", handleUnauthorized)
+    return () => {
+      window.removeEventListener(
+        "sim-persediaan:unauthorized",
+        handleUnauthorized,
+      )
+    }
+  }, [])
+
   const login = async (credentials: LoginCredentials) => {
     const authenticatedUser = await authService.login(credentials)
     setUser(authenticatedUser)

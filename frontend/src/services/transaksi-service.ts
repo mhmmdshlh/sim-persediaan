@@ -1,4 +1,8 @@
-import { apiRequest } from "@/services/api"
+import {
+  apiRequest,
+  apiRequestWithMeta,
+  type PaginationMeta,
+} from "@/services/api"
 import type {
   JenisTransaksi,
   TransaksiDraft,
@@ -16,12 +20,20 @@ interface TransaksiQuery {
   search?: string
 }
 
-export function getTransaksiList(
+export interface TransaksiListResult {
+  items: TransaksiResponse[]
+  pagination: PaginationMeta
+}
+
+export async function getTransaksiList(
   filters: TransaksiQuery = {},
-): Promise<TransaksiResponse[]> {
+): Promise<TransaksiListResult> {
+  const page = filters.page ?? 1
+  const pageSize = filters.page_size ?? 25
+
   const params = new URLSearchParams({
-    page: String(filters.page ?? 1),
-    page_size: String(filters.page_size ?? 100),
+    page: String(page),
+    page_size: String(pageSize),
   })
 
   if (filters.jenis_transaksi) {
@@ -48,15 +60,19 @@ export function getTransaksiList(
     params.set("search", filters.search.trim())
   }
 
-  return apiRequest<TransaksiResponse[]>(
+  const res = await apiRequestWithMeta<TransaksiResponse[]>(
     `/api/transaksi?${params.toString()}`,
   )
-}
 
-export function getTransaksiById(
-  id: string,
-): Promise<TransaksiResponse> {
-  return apiRequest<TransaksiResponse>(`/api/transaksi/${id}`)
+  return {
+    items: res.data,
+    pagination: res.pagination ?? {
+      page,
+      page_size: pageSize,
+      total_items: res.data.length,
+      total_pages: 1,
+    },
+  }
 }
 
 export function createTransaksi(
